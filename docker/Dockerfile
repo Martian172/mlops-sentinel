@@ -8,4 +8,7 @@ COPY . .
 RUN pip install -e .
 
 EXPOSE 8080
-CMD ["uvicorn", "sentinel.dashboard.app:app", "--host", "0.0.0.0", "--port", "8080"]
+ENV SENTINEL_HOST=0.0.0.0 SENTINEL_PORT=8080
+# run_demo.py serves the dashboard with a live simulated model attached;
+# the bare dashboard app would render empty until set_monitor() is called.
+CMD ["python", "run_demo.py"]

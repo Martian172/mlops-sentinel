@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
 # Lazy import to avoid circular deps
@@ -113,6 +113,14 @@ async def log_prediction(payload: PredictionLog):
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "version": "0.2.0", "timestamp": time.time()}
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+async def prometheus_metrics():
+    """Prometheus scrape endpoint (text exposition format)."""
+    if _monitor is None:
+        return "# no monitor configured\n"
+    return _monitor.metrics_collector.get_prometheus_metrics()
 
 
 @app.websocket("/ws")

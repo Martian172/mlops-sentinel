@@ -231,13 +231,15 @@ monitor = ModelMonitor(
 
 ## Prometheus + Grafana Integration
 
-Add to your prometheus.yml:
+The dashboard exposes Prometheus metrics at `/metrics`. If you run your own
+Prometheus, add a scrape config pointing at wherever the dashboard runs
+(port 8001 with `python run_demo.py`, 8080 in the Docker image):
 
 ```yaml
 scrape_configs:
   - job_name: 'mlops-sentinel'
     static_configs:
-      - targets: ['localhost:8080']
+      - targets: ['localhost:8001']
     metrics_path: '/metrics'
     scrape_interval: 15s
 ```
@@ -255,15 +257,23 @@ Available Prometheus metrics:
 
 ### Docker Compose (Sentinel + Prometheus + Grafana)
 
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) to
+be installed and running:
+
 ```bash
 cd docker
-docker-compose up -d
+docker compose up -d --build
 ```
 
-Services:
-- Sentinel Dashboard: http://localhost:8080
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000 (admin/sentinel123)
+Services (available once the containers are up):
+- Sentinel Dashboard: http://localhost:8080 — runs the demo model with live
+  simulated traffic (drift starts after ~2 minutes)
+- Prometheus: http://localhost:9090 — scrapes the dashboard's `/metrics`
+  every 15 s (try querying `sentinel_accuracy`)
+- Grafana: http://localhost:3000 (login `admin` / `sentinel123`) — add
+  Prometheus (`http://prometheus:9090`) as a data source to build dashboards
+
+Stop everything with `docker compose down`.
 
 ---
 

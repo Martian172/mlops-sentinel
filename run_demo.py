@@ -8,6 +8,7 @@ dashboard has something interesting to show), and serves the dashboard.
 Usage:
     python run_demo.py            # dashboard at http://127.0.0.1:8001
 """
+import os
 import random
 import threading
 import time
@@ -83,6 +84,8 @@ def simulate_traffic() -> None:
 threading.Thread(target=simulate_traffic, daemon=True).start()
 
 if __name__ == "__main__":
-    print("MLOps Sentinel demo dashboard: http://127.0.0.1:8001")
+    host = os.environ.get("SENTINEL_HOST", "127.0.0.1")
+    port = int(os.environ.get("SENTINEL_PORT", "8001"))
+    print(f"MLOps Sentinel demo dashboard: http://{host}:{port}")
     print("Simulated predictions are streaming in; drift begins after ~2 minutes.")
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host=host, port=port)
