@@ -54,22 +54,41 @@ async def get_metrics():
 async def get_drift():
     """Return drift detection report."""
     if _monitor:
-        return _monitor.get_drift_report()
+        report = _monitor.get_drift_report()
+        if report is None:
+            return {"status": "insufficient_data"}
+        return report.to_dict()
     return {"status": "no_monitor"}
 
 
 @app.get("/api/alerts")
 async def get_alerts():
     """Return recent alerts."""
+    if _monitor:
+        alerts = _monitor.alert_manager.get_history(limit=50)
+        return {"alerts": alerts, "total": len(alerts)}
     return {"alerts": [], "total": 0}
 
 
 @app.get("/api/performance")
-async def get_performance():
-    """Return performance over time."""
-    if _monitor:
-        return {"history": _monitor.get_performance_history()}
-    return {"history": []}
+async def get_performance(bucket_size: int = 20):
+    """Return performance over time (accuracy per bucket of predictions)."""
+    if _monitor is None:
+        return {"history": []}
+    records = _monitor.storage.query(model_name=_monitor.model_name)
+    labeled = sorted(
+        (r for r in records if r.actual is not None), key=lambda r: r.timestamp
+    )
+    history = []
+    for i in range(0, len(labeled), bucket_size):
+        chunk = labeled[i : i + bucket_size]
+        correct = sum(1 for r in chunk if r.prediction == r.actual)
+        history.append({
+            "timestamp": chunk[-1].timestamp.isoformat(),
+            "accuracy": correct / len(chunk),
+            "n_predictions": len(chunk),
+        })
+    return {"history": history}
 
 
 @app.post("/api/log")

@@ -1,21 +1,35 @@
 """MLOps Sentinel — Quickstart Example."""
 import random
-from sentinel.core.monitor import ModelMonitor
+
+import numpy as np
+
 from sentinel.core.alerts import AlertManager, AlertRule
+from sentinel.core.monitor import ModelMonitor
 
-# 1. Create a monitor
-monitor = ModelMonitor(model_name="fraud-detector-v2", task="classification")
-
-# 2. Optionally configure alerts
+# 1. Configure alerts
 alert_mgr = AlertManager()
 alert_mgr.add_rule(AlertRule(
     name="low-accuracy",
     metric="accuracy",
     threshold=0.90,
-    condition="less_than",
+    comparison="lt",
     severity="WARNING",
 ))
-monitor.set_alert_manager(alert_mgr)
+
+# 2. Create a monitor with baseline (training) data for drift detection
+rng = np.random.default_rng(42)
+baseline = np.column_stack([
+    rng.integers(18, 70, size=500),            # age
+    rng.uniform(20_000, 150_000, size=500),    # income
+    rng.integers(300, 850, size=500),          # credit_score
+])
+monitor = ModelMonitor(
+    model_name="fraud-detector-v2",
+    task_type="classification",
+    baseline_data=baseline,
+    feature_names=["age", "income", "credit_score"],
+    alert_manager=alert_mgr,
+)
 
 # 3. Simulate predictions
 print("Logging 100 predictions...")
@@ -37,5 +51,11 @@ for k, v in perf.items():
 
 print("\n=== Drift Report ===")
 drift = monitor.get_drift_report()
-print(f"  Overall drift score: {drift.get('overall_drift_score', 'N/A')}")
-print(f"  Is drifted: {drift.get('is_drifted', False)}")
+if drift is None:
+    print("  Not enough data for drift detection yet.")
+else:
+    print(f"  Overall drift score: {drift.drift_score:.4f}")
+    print(f"  Is drifted: {drift.is_drifted}")
+    print(f"  Drifted features: {drift.drifted_features}")
+
+print(f"\nHealth score: {monitor.get_health_score():.2f}")

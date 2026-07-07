@@ -265,7 +265,7 @@ class DriftDetector:
         baseline_data: np.ndarray,
         ks_threshold: float = 0.05,
         psi_threshold: float = 0.20,
-        drift_score_threshold: float = 0.15,
+        drift_score_threshold: float = 0.5,
         n_bins: int = 10,
     ) -> None:
         if baseline_data.ndim == 1:
@@ -345,7 +345,11 @@ class DriftDetector:
             model_name=model_name,
             timestamp=datetime.utcnow(),
             drift_score=aggregate_score,
-            is_drifted=aggregate_score > self.drift_score_threshold,
+            # Drifted if any feature failed its statistical test, or the
+            # aggregate score is high (1 - p_value noise floor is ~0.2 for
+            # identical distributions, so the score alone needs a high bar).
+            is_drifted=bool(drifted_features)
+            or aggregate_score > self.drift_score_threshold,
             feature_stats=feature_stats,
             drifted_features=drifted_features,
             n_baseline_samples=len(self.baseline_data),
