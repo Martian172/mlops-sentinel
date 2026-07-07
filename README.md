@@ -122,11 +122,28 @@ print(f"F1 Score: {perf_report['f1']:.4f}")
 
 ### Start the Dashboard
 
+**Try it in 10 seconds** — launch the dashboard with a simulated fraud-detection
+model streaming live predictions (data drift kicks in after ~2 minutes so you
+can watch Sentinel catch it):
+
 ```bash
-sentinel monitor start --port 8080
+python run_demo.py
 ```
 
-Then open http://localhost:8080 in your browser.
+Then open http://127.0.0.1:8001 in your browser.
+
+To serve the dashboard for your own model, inject your monitor and run the app:
+
+```python
+import uvicorn
+from sentinel.dashboard.app import app, set_monitor
+
+set_monitor(my_monitor)  # your ModelMonitor instance
+uvicorn.run(app, host="127.0.0.1", port=8001)
+```
+
+> Note: `sentinel monitor start` serves the dashboard without a monitor
+> attached, so it will show no data until your process calls `set_monitor()`.
 
 ### CLI Commands
 
