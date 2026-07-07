@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MLOps Sentinel — Model Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0f1e;
+      --surface: #111827;
+      --surface2: #1a2236;
+      --border: #1f2e4a;
+      --accent: #00e5a0;
+      --accent2: #00bcd4;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Navbar */
+    .navbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem; height: 64px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .logo { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.1rem; }
+    .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .nav-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* Layout */
+    .main { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; padding: 1.5rem 2rem; max-width: 1600px; margin: 0 auto; }
+    .left { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    /* Stat cards */
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,229,160,0.08); }
+    .card-label { font-size: 0.75rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .card-value { font-size: 2rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .card-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+    .card.green .card-value { color: var(--accent); }
+    .card.cyan .card-value { color: var(--accent2); }
+    .card.warn .card-value { color: var(--warn); }
+    .card.danger .card-value { color: var(--danger); }
+
+    /* Charts */
+    .chart-panel {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+    .panel-title { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+    .panel-title::before { content: ''; width: 3px; height: 1em; background: var(--accent); border-radius: 2px; }
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+    /* Alert feed */
+    .alerts-panel {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; height: fit-content;
+      position: sticky; top: 80px;
+    }
+    .alert-item {
+      background: var(--surface2); border-radius: 8px; padding: 0.75rem 1rem;
+      border-left: 3px solid var(--accent); animation: slideIn 0.3s ease;
+      font-size: 0.82rem;
+    }
+    @keyframes slideIn { from{transform:translateX(20px);opacity:0} to{transform:translateX(0);opacity:1} }
+    .alert-item.warn { border-color: var(--warn); }
+    .alert-item.danger { border-color: var(--danger); }
+    .alert-time { color: var(--muted); font-size: 0.72rem; margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace; }
+    .badge { display: inline-flex; align-items: center; font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; margin-right: 0.4rem; }
+    .badge.info { background: rgba(0,229,160,0.15); color: var(--accent); }
+    .badge.warn { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .badge.crit { background: rgba(239,68,68,0.15); color: var(--danger); }
+
+    /* Log input */
+    .log-form {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1rem 1.5rem;
+    }
+    .log-form textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+      padding: 0.75rem; resize: vertical; min-height: 80px; outline: none;
+    }
+    .log-form textarea:focus { border-color: var(--accent); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: var(--accent); color: #0a0f1e; font-weight: 600; font-size: 0.85rem;
+      padding: 0.5rem 1.2rem; border: none; border-radius: 8px; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s; margin-top: 0.75rem;
+    }
+    .btn:hover { opacity: 0.9; transform: scale(1.02); }
+
+    canvas { max-height: 220px; }
+
+    @media (max-width: 1024px) {
+      .main { grid-template-columns: 1fr; }
+      .cards { grid-template-columns: repeat(2, 1fr); }
+      .charts-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <span>MLOps <strong>Sentinel</strong></span>
+  </div>
+  <div class="nav-status">
+    <div class="status-dot"></div>
+    <span id="ws-status">Connecting...</span>
+    &nbsp;|&nbsp; Model: <strong id="model-name">production-v1</strong>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="left">
+    <!-- Stat Cards -->
+    <div class="cards">
+      <div class="card green">
+        <div class="card-label">Health Score</div>
+        <div class="card-value" id="health-score">98.2%</div>
+        <div class="card-sub">↑ 0.4% from yesterday</div>
+      </div>
+      <div class="card cyan">
+        <div class="card-label">Predictions</div>
+        <div class="card-value" id="pred-count">14,207</div>
+        <div class="card-sub">Last 24 hours</div>
+      </div>
+      <div class="card warn">
+        <div class="card-label">Drift Score</div>
+        <div class="card-value" id="drift-score">0.12</div>
+        <div class="card-sub">3 features monitored</div>
+      </div>
+      <div class="card danger">
+        <div class="card-label">Active Alerts</div>
+        <div class="card-value" id="alert-count">2</div>
+        <div class="card-sub">1 critical, 1 warning</div>
+      </div>
+    </div>
+
+    <!-- Performance Chart -->
+    <div class="chart-panel">
+      <div class="panel-title">Model Performance Over Time</div>
+      <canvas id="perfChart"></canvas>
+    </div>
+
+    <!-- Drift + Distribution -->
+    <div class="charts-row">
+      <div class="chart-panel">
+        <div class="panel-title">Feature Drift Scores</div>
+        <canvas id="driftChart"></canvas>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title">Prediction Distribution</div>
+        <canvas id="distChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Log Prediction -->
+    <div class="log-form">
+      <div class="panel-title" style="margin-bottom:0.75rem">Log a Prediction</div>
+      <textarea id="log-json" placeholder='{"features": {"age": 32, "income": 75000}, "prediction": 1, "actual": 1}'></textarea>
+      <button class="btn" onclick="logPrediction()">⚡ Log Prediction</button>
+    </div>
+  </div>
+
+  <!-- Alert Feed -->
+  <div class="alerts-panel">
+    <div class="panel-title">Live Alert Feed</div>
+    <div id="alerts-list">
+      <div class="alert-item info">
+        <span class="badge info">INFO</span>Model loaded successfully
+        <div class="alert-time">14:08:03</div>
+      </div>
+      <div class="alert-item warn">
+        <span class="badge warn">WARN</span>Feature drift detected: <code>age</code> (PSI=0.18)
+        <div class="alert-time">14:05:41</div>
+      </div>
+      <div class="alert-item danger">
+        <span class="badge crit">CRIT</span>Accuracy dropped below 90% threshold
+        <div class="alert-time">13:52:17</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Charts ──────────────────────────────────────────────────────────
+  const hours = Array.from({length:24}, (_,i) => `${String(i).padStart(2,'0')}:00`);
+  const perfCtx = document.getElementById('perfChart').getContext('2d');
+  new Chart(perfCtx, {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [
+        { label: 'Accuracy', data: hours.map(()=>0.88+Math.random()*0.10), borderColor:'#00e5a0', tension:0.4, fill:true, backgroundColor:'rgba(0,229,160,0.05)', borderWidth:2, pointRadius:0 },
+        { label: 'F1 Score', data: hours.map(()=>0.85+Math.random()*0.10), borderColor:'#00bcd4', tension:0.4, fill:false, borderWidth:2, pointRadius:0 },
+      ]
+    },
+    options: { responsive:true, plugins:{legend:{labels:{color:'#94a3b8'}}}, scales:{x:{ticks:{color:'#64748b'},grid:{color:'#1f2e4a'}},y:{ticks:{color:'#64748b'},grid:{color:'#1f2e4a'},min:0.7,max:1.0}} }
+  });
+
+  const driftCtx = document.getElementById('driftChart').getContext('2d');
+  new Chart(driftCtx, {
+    type: 'bar',
+    data: {
+      labels: ['age', 'income', 'score', 'tenure', 'region'],
+      datasets: [{ label: 'PSI Score', data: [0.18, 0.07, 0.03, 0.12, 0.05], backgroundColor: ['#ef4444','#00e5a0','#00e5a0','#f59e0b','#00e5a0'], borderRadius:6 }]
+    },
+    options: { responsive:true, plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#64748b'},grid:{color:'#1f2e4a'}},y:{ticks:{color:'#64748b'},grid:{color:'#1f2e4a'},max:0.3}} }
+  });
+
+  const distCtx = document.getElementById('distChart').getContext('2d');
+  new Chart(distCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Class 0', 'Class 1'],
+      datasets: [{ data: [38, 62], backgroundColor: ['#1f2e4a','#00e5a0'], borderColor:['#0a0f1e','#0a0f1e'], borderWidth:3 }]
+    },
+    options: { responsive:true, plugins:{legend:{labels:{color:'#94a3b8'}}} }
+  });
+
+  // ── WebSocket ────────────────────────────────────────────────────────
+  const wsStatus = document.getElementById('ws-status');
+  let ws;
+  function connectWS() {
+    ws = new WebSocket(`ws://${location.host}/ws`);
+    ws.onopen = () => wsStatus.textContent = 'Live';
+    ws.onclose = () => { wsStatus.textContent = 'Disconnected'; setTimeout(connectWS, 3000); };
+    ws.onmessage = e => {
+      const data = JSON.parse(e.data);
+      if (data.event === 'prediction_logged') refreshMetrics();
+    };
+  }
+  connectWS();
+
+  // ── API ──────────────────────────────────────────────────────────────
+  async function refreshMetrics() {
+    try {
+      const r = await fetch('/api/metrics');
+      if (r.ok) { const d = await r.json(); console.log('Metrics:', d); }
+    } catch(_) {}
+  }
+
+  async function logPrediction() {
+    const raw = document.getElementById('log-json').value.trim();
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(raw);
+      const r = await fetch('/api/log', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const d = await r.json();
+      if (d.status === 'logged') addAlert('info', 'Prediction logged ✓');
+    } catch(e) { addAlert('danger', 'Invalid JSON: ' + e.message); }
+  }
+
+  function addAlert(type, msg) {
+    const list = document.getElementById('alerts-list');
+    const el = document.createElement('div');
+    el.className = `alert-item ${type === 'info' ? 'info' : 'danger'}`;
+    const badge = type === 'info' ? '<span class="badge info">INFO</span>' : '<span class="badge crit">ERROR</span>';
+    el.innerHTML = `${badge}${msg}<div class="alert-time">${new Date().toLocaleTimeString()}</div>`;
+    list.prepend(el);
+  }
+
+  // ── Live counter animation ────────────────────────────────────────────
+  setInterval(() => {
+    const el = document.getElementById('pred-count');
+    el.textContent = (parseInt(el.textContent.replace(/,/g,'')) + Math.floor(Math.random()*5)).toLocaleString();
+  }, 3000);
+</script>
+</body>
+</html>
