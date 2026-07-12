@@ -1,0 +1,14 @@
+{
+  "name": "mlops-sentinel",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "pip install -r requirements-dev.txt && pip install -e .",
+  "forwardPorts": [8001],
+  "portsAttributes": {
+    "8001": { "label": "Sentinel control room", "onAutoForward": "openPreview" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"]
+    }
+  }
+}

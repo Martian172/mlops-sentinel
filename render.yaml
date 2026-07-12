@@ -1,0 +1,15 @@
+# One-click deploy blueprint for https://render.com
+# Dashboard → New → Blueprint → point at this repo.
+services:
+  - type: web
+    name: mlops-sentinel
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: SENTINEL_HOST
+        value: 0.0.0.0
+      # Render injects PORT; run_demo.py picks it up automatically.
+      - key: SENTINEL_DRIFT_MIN
+        value: "2"

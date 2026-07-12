@@ -1,317 +1,243 @@
-# 🛡️ MLOps Sentinel — Production ML Model Monitoring & Alerting
+<div align="center">
 
-<p align="center">
-  <img src="https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+"/>
-  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="MIT License"/>
-  <img src="https://img.shields.io/badge/version-0.2.0-orange?style=for-the-badge" alt="Version 0.2.0"/>
-  <img src="https://img.shields.io/badge/tests-passing-brightgreen?style=for-the-badge&logo=github-actions" alt="Tests Passing"/>
-  <img src="https://img.shields.io/badge/FastAPI-0.100%2B-009688?style=for-the-badge&logo=fastapi" alt="FastAPI"/>
-  <img src="https://img.shields.io/badge/prometheus-ready-E6522C?style=for-the-badge&logo=prometheus&logoColor=white" alt="Prometheus Ready"/>
-</p>
+# SENTINEL
 
-<p align="center">
-  <b>A production-grade toolkit for monitoring ML models in production.</b><br/>
-  Detect data drift, track model performance, fire alerts to Slack/Email/Webhooks, and visualize everything in a beautiful real-time dashboard.
-</p>
+**A control room for machine-learning models in production.**
 
----
+[![CI](https://github.com/Martian172/mlops-sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/Martian172/mlops-sentinel/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Version](https://img.shields.io/badge/version-0.3.0-e84b0c)
+![License](https://img.shields.io/badge/license-MIT-177245)
 
-## Key Features
+*Your model was 95% accurate at launch. It's 71% today. Nobody noticed —
+because a decaying model doesn't crash. It just quietly starts being wrong.*
 
-| Feature | Description |
-|---|---|
-| Data Drift Detection | KS-test, PSI, Jensen-Shannon divergence, chi-square for categorical features |
-| Concept Drift Detection | Page-Hinkley and ADWIN algorithms for detecting shifts in model behavior |
-| Performance Monitoring | Accuracy, Precision, Recall, F1, MAE, RMSE, AUC tracked over time |
-| Smart Alerting | Slack webhooks, Email (SMTP), generic webhooks with configurable thresholds |
-| Real-time Dashboard | Dark-theme web UI with Chart.js charts, live WebSocket updates |
-| REST API | FastAPI backend for programmatic access to all monitoring data |
-| Prometheus Metrics | Native /metrics endpoint compatible with Prometheus and Grafana |
-| Scikit-learn Integration | Drop-in SentinelClassifier / SentinelRegressor wrappers |
-| Flexible Storage | In-memory (zero config) or SQLite persistence |
-| CLI | Full-featured command-line interface powered by Click and Rich |
+<img src="docs/assets/dashboard.png" alt="Sentinel control-room dashboard catching live data drift" width="920"/>
+
+*Live capture: Sentinel catching demographic drift in a fraud model —
+`age` and `income` tripped their PSI limits, `credit_score` held stable,
+and the status board dropped from NOMINAL to CRITICAL.*
+
+</div>
 
 ---
 
-## Architecture
+## The problem
 
-```
-+---------------------------------------------------------------------+
-|                        MLOps Sentinel                               |
-|                                                                     |
-|  +--------------+    +--------------+    +-----------------------+  |
-|  |  Your ML App |---▶|  ModelMonitor|---▶|   Storage Backend     |  |
-|  |  (sklearn,   |    |              |    |  +-----------------+  |  |
-|  |   pytorch,   |    | log_predict()|    |  |  InMemory/SQLite |  |  |
-|  |   xgboost)   |    | get_report() |    |  +-----------------+  |  |
-|  +--------------+    +------+-------+    +-----------------------+  |
-|                             |                                       |
-|              +--------------+--------------+                        |
-|              v              v              v                        |
-|  +---------------+ +--------------+ +---------------------------+  |
-|  | DriftDetector | |MetricsCollect| |     AlertManager          |  |
-|  |               | |              | |  +------+ +----------+    |  |
-|  | KS-test       | | Prometheus   | |  |Slack | |  Email   |    |  |
-|  | PSI           | | Gauges       | |  +------+ +----------+    |  |
-|  | ADWIN         | | Histograms   | |  +------------------+     |  |
-|  | Page-Hinkley  | | Counters     | |  |  Webhook         |     |  |
-|  +---------------+ +------+-------+ |  +------------------+     |  |
-|                           |         +---------------------------+   |
-|                           v                                         |
-|  +------------------------------------------------------------------+|
-|  |                   FastAPI Dashboard Server                       ||
-|  |  GET /api/metrics  GET /api/drift  GET /api/alerts  WS /ws      ||
-|  |  +----------------------------------------------------------+   ||
-|  |  |  Dark Web Dashboard  (Chart.js + WebSocket)               |   ||
-|  |  +----------------------------------------------------------+   ||
-|  |  GET /metrics  <---- Prometheus / Grafana                        ||
-|  +------------------------------------------------------------------+|
-+---------------------------------------------------------------------+
-```
+Every deployed ML model is a bet that the future will look like the training
+data. The future disagrees: customers get younger, prices inflate, fraudsters
+adapt. This is **drift**, and it is invisible to normal monitoring — CPU is
+fine, latency is fine, HTTP 200s all around. The predictions are just wrong.
 
----
+Worse: at prediction time you usually *can't check accuracy*, because the
+ground truth (did the loan default? was it fraud?) arrives weeks later.
 
-## Quick Start
+Sentinel attacks this from three angles:
 
-### Installation
+| Question | Needs labels? | How Sentinel answers it |
+|---|---|---|
+| Do inputs still look like training data? | **No** | KS test, chi-square, PSI, JS divergence per feature |
+| Has the input→output relationship changed? | Errors only | Streaming ADWIN + Page-Hinkley on the error rate |
+| Is the model still performing? | Yes (late is fine) | Accuracy/F1/MAE tracked as ground truth arrives |
+
+When something trips, Sentinel tells you **which feature broke, by how much,
+and since when** — then pings Slack, email, or any webhook.
+
+## 60-second start
 
 ```bash
-pip install mlops-sentinel
-```
-
-Or install from source:
-
-```bash
-git clone https://github.com/yourorg/mlops-sentinel.git
+git clone https://github.com/Martian172/mlops-sentinel.git
 cd mlops-sentinel
-pip install -e ".[dev]"
+pip install -r requirements.txt
+python run_demo.py
 ```
 
-### 30-Second Example
+Open **http://127.0.0.1:8001**. You're watching a simulated fraud model under
+live traffic. After ~2 minutes its customers start drifting younger and richer
+— watch the PSI bars climb, the accuracy line sag, and the alert log light up.
+(Impatient? `SENTINEL_DRIFT_MIN=0.5 python run_demo.py` starts the decay at
+30 seconds.)
+
+## Monitor your own model
 
 ```python
 from sentinel import ModelMonitor
 import numpy as np
 
-# Initialize monitor with your baseline (training) data
-baseline_features = np.random.randn(1000, 5)
 monitor = ModelMonitor(
     model_name="fraud-detector-v2",
-    baseline_data=baseline_features,
-    feature_names=["amount", "merchant_cat", "hour", "country_code", "velocity"]
+    baseline_data=X_train,                      # what "normal" looks like
+    feature_names=["amount", "hour", "country"],
 )
 
-# Log predictions as they happen in production
-monitor.log_prediction(
-    features={"amount": 142.5, "merchant_cat": 3, "hour": 14,
-               "country_code": 1, "velocity": 0.8},
+# in your serving path — one call per prediction
+record_id = monitor.log_prediction(
+    features={"amount": 142.5, "hour": 14, "country": 1},
     prediction=0,
-    actual=0,          # optional - when ground truth arrives later
-    latency_ms=12.4    # optional
+    latency_ms=12.4,
 )
 
-# Get reports
-drift_report = monitor.get_drift_report()
-print(f"Drift detected: {drift_report.is_drifted}")
-print(f"Drift score: {drift_report.drift_score:.4f}")
+# ground truth arrives three weeks later? no problem
+monitor.update_actual(record_id, actual=1)
 
-perf_report = monitor.get_performance_report()
-print(f"Accuracy: {perf_report['accuracy']:.2%}")
-print(f"F1 Score: {perf_report['f1']:.4f}")
+report = monitor.get_drift_report()
+print(report.is_drifted, report.drifted_features)
 ```
 
-### Start the Dashboard
-
-**Try it in 10 seconds** — launch the dashboard with a simulated fraud-detection
-model streaming live predictions (data drift kicks in after ~2 minutes so you
-can watch Sentinel catch it):
-
-```bash
-python run_demo.py
-```
-
-Then open http://127.0.0.1:8001 in your browser.
-
-To serve the dashboard for your own model, inject your monitor and run the app:
-
-```python
-import uvicorn
-from sentinel.dashboard.app import app, set_monitor
-
-set_monitor(my_monitor)  # your ModelMonitor instance
-uvicorn.run(app, host="127.0.0.1", port=8001)
-```
-
-> Note: `sentinel monitor start` serves the dashboard without a monitor
-> attached, so it will show no data until your process calls `set_monitor()`.
-
-### CLI Commands
-
-```bash
-# Start monitoring server
-sentinel monitor start --port 8080 --host 0.0.0.0
-
-# View drift report
-sentinel report drift --model fraud-detector-v2
-
-# View performance report
-sentinel report performance --model fraud-detector-v2
-
-# List recent alerts
-sentinel alerts list --limit 20
-
-# Send a test alert to configured channels
-sentinel alerts test --severity WARNING
-```
-
----
-
-## Scikit-learn Integration
+Or wrap a scikit-learn estimator — the training data becomes the drift
+baseline automatically:
 
 ```python
 from sklearn.ensemble import RandomForestClassifier
 from sentinel.integrations.sklearn import SentinelClassifier
 
-clf = RandomForestClassifier(n_estimators=100)
-monitored_clf = SentinelClassifier(
-    model=clf,
+clf = SentinelClassifier(
+    model=RandomForestClassifier(n_estimators=100),
     model_name="churn-predictor",
-    baseline_data=X_train
 )
-
-monitored_clf.fit(X_train, y_train)
-
-# predict() automatically logs to Sentinel
-predictions = monitored_clf.predict(X_test)
-probabilities = monitored_clf.predict_proba(X_test)
+clf.fit(X_train, y_train)     # X_train captured as baseline
+clf.predict(X_test)           # every prediction logged
+clf.monitor.get_drift_report()
 ```
 
----
-
-## Alerting Setup
+## Alerting
 
 ```python
-from sentinel import ModelMonitor
-from sentinel.core.alerts import AlertManager, SlackAlertChannel, EmailAlertChannel, AlertRule
+from sentinel.core.alerts import AlertManager, AlertRule, SlackAlertChannel
 
-alert_manager = AlertManager()
-alert_manager.add_channel(SlackAlertChannel(
-    webhook_url="https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
-))
-alert_manager.add_channel(EmailAlertChannel(
-    smtp_host="smtp.gmail.com",
-    smtp_port=587,
-    username="alerts@yourcompany.com",
-    password="your-app-password",
-    recipients=["mlops-team@yourcompany.com"]
-))
+alerts = AlertManager()
+alerts.add_channel(SlackAlertChannel(webhook_url="https://hooks.slack.com/..."))
+alerts.add_rule(AlertRule("accuracy-floor", metric="accuracy",
+                          threshold=0.85, comparison="lt", severity="CRITICAL"))
+alerts.add_rule(AlertRule("drift-ceiling", metric="drift_score",
+                          threshold=0.60, comparison="gt", severity="WARNING"))
 
-alert_manager.add_rule(AlertRule(
-    name="high_drift",
-    metric="drift_score",
-    threshold=0.15,
-    severity="CRITICAL",
-    comparison="gt"
-))
-alert_manager.add_rule(AlertRule(
-    name="accuracy_drop",
-    metric="accuracy",
-    threshold=0.85,
-    severity="WARNING",
-    comparison="lt"
-))
-
-monitor = ModelMonitor(
-    model_name="my-model",
-    alert_manager=alert_manager
-)
+monitor = ModelMonitor("my-model", alert_manager=alerts)
 ```
 
----
+Rules support `gt/lt/gte/lte/eq`, per-rule cooldowns (default 300 s — a
+flapping metric won't spam your channel), and three channels out of the box:
+Slack webhooks, SMTP email (plain + HTML), and generic HTTP webhooks. Concept
+drift fires a CRITICAL alert automatically the moment the error rate shifts.
 
-## Prometheus + Grafana Integration
-
-The dashboard exposes Prometheus metrics at `/metrics`. If you run your own
-Prometheus, add a scrape config pointing at wherever the dashboard runs
-(port 8001 with `python run_demo.py`, 8080 in the Docker image):
-
-```yaml
-scrape_configs:
-  - job_name: 'mlops-sentinel'
-    static_configs:
-      - targets: ['localhost:8001']
-    metrics_path: '/metrics'
-    scrape_interval: 15s
-```
-
-Available Prometheus metrics:
-
-| Metric | Type | Description |
-|---|---|---|
-| sentinel_predictions_total | Counter | Total predictions logged |
-| sentinel_prediction_latency_seconds | Histogram | Prediction latency distribution |
-| sentinel_accuracy | Gauge | Current model accuracy |
-| sentinel_drift_score | Gauge | Current drift score per feature |
-| sentinel_alerts_total | Counter | Total alerts fired |
-| sentinel_error_rate | Gauge | Current error/failure rate |
-
-### Docker Compose (Sentinel + Prometheus + Grafana)
-
-Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) to
-be installed and running:
+## The full stack, one command
 
 ```bash
-cd docker
-docker compose up -d --build
+cd docker && docker compose up -d --build
 ```
 
-Services (available once the containers are up):
-- Sentinel Dashboard: http://localhost:8080 — runs the demo model with live
-  simulated traffic (drift starts after ~2 minutes)
-- Prometheus: http://localhost:9090 — scrapes the dashboard's `/metrics`
-  every 15 s (try querying `sentinel_accuracy`)
-- Grafana: http://localhost:3000 (login `admin` / `sentinel123`) — add
-  Prometheus (`http://prometheus:9090`) as a data source to build dashboards
+| Service | URL | What it does |
+|---|---|---|
+| Sentinel | http://localhost:8080 | control room + demo model under live traffic |
+| Prometheus | http://localhost:9090 | scrapes `/metrics` every 15 s — try `sentinel_drift_score` |
+| Grafana | http://localhost:3000 | dashboards on top (login `admin` / `sentinel123`) |
 
-Stop everything with `docker compose down`.
+Six native Prometheus series are exposed, all labeled by model:
+`sentinel_predictions_total`, `sentinel_prediction_latency_seconds` (histogram),
+`sentinel_accuracy`, `sentinel_drift_score`, `sentinel_alerts_total`,
+`sentinel_error_rate`.
 
----
+## REST API & CLI
 
-## Project Structure
+The dashboard is an ordinary FastAPI app — everything on screen is available
+as JSON (interactive console at `/docs`):
 
-```
-mlops-sentinel/
-├── sentinel/
-│   ├── core/
-│   │   ├── monitor.py
-│   │   ├── drift.py
-│   │   ├── alerts.py
-│   │   └── metrics.py
-│   ├── dashboard/
-│   │   ├── app.py
-│   │   └── templates/index.html
-│   ├── cli/
-│   │   └── commands.py
-│   ├── integrations/
-│   │   └── sklearn.py
-│   └── storage/
-│       └── backend.py
-├── examples/
-├── tests/
-├── docker/
-└── .github/workflows/
+| Endpoint | Returns |
+|---|---|
+| `GET /api/snapshot` | live counters, health, latency history, class mix |
+| `GET /api/drift` | full drift report, per-feature statistics |
+| `GET /api/performance?bucket_size=20` | accuracy over time, bucketed |
+| `GET /api/alerts` | recent alert history |
+| `POST /api/log` | log a prediction over HTTP |
+| `GET /metrics` | Prometheus text exposition |
+
+The CLI talks to the same API (point it anywhere with `SENTINEL_API`):
+
+```bash
+sentinel monitor start --port 8080     # serve the dashboard
+sentinel report drift                  # feature-by-feature drift table
+sentinel report performance            # accuracy / F1 / latency table
+sentinel alerts list                   # recent alerts
+sentinel alerts test --slack-webhook https://hooks.slack.com/...
 ```
 
----
+## How it works
+
+```mermaid
+flowchart LR
+    A["your model<br/>(any framework)"] -- "log_prediction()" --> M[ModelMonitor]
+    M --> S[("storage<br/>in-memory / SQLite")]
+    M --> D["DriftDetector<br/>KS · chi² · PSI · JS"]
+    M --> C["ADWIN + Page-Hinkley<br/>streaming error watch"]
+    M --> P["MetricsCollector<br/>Prometheus registry"]
+    D & C --> AM["AlertManager<br/>rules · cooldowns"]
+    AM --> CH["Slack · Email · Webhook"]
+    S & P --> API["FastAPI<br/>REST + WebSocket + /metrics"]
+    API --> UI["control-room UI"]
+    API --> PR["Prometheus → Grafana"]
+```
+
+The decisions that matter:
+
+- **Statistical tests decide, scores describe.** A feature is "drifted" only
+  when a real test says so (KS p < 0.05, or PSI > 0.20). The blended 0–1
+  drift score is for dashboards and severity — it never makes the call alone,
+  because `1 − p` has a noise floor even on identical distributions.
+- **Monitoring never breaks serving.** Storage failures, drift-check errors,
+  and dead Slack webhooks are caught, logged, and counted — `log_prediction()`
+  stays O(1) and never raises. Drift checks run every N predictions
+  (default 100), not on the hot path.
+- **Everything is swappable.** `StorageBackend` is an ABC (in-memory and
+  SQLite ship in the box); alert channels share one base class; the Prometheus
+  registry is per-monitor so several models coexist in one process.
+- **Labels can be late.** `log_prediction()` returns an ID;
+  `update_actual(id, truth)` attaches ground truth whenever it shows up.
+
+## Configuration
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `SENTINEL_HOST` / `SENTINEL_PORT` | `127.0.0.1` / `8001` | demo server bind (`PORT` also honored) |
+| `SENTINEL_DRIFT_MIN` | `2` | minutes before simulated drift begins |
+| `SENTINEL_API` | `http://127.0.0.1:8001` | dashboard URL the CLI queries |
+
+## Run it in the cloud
+
+- **GitHub Codespaces** — open this repo in a Codespace, run
+  `pip install -r requirements.txt && python run_demo.py`, and Codespaces
+  forwards port 8001 to a shareable URL.
+- **Render / Railway / Fly** — deploy the included `docker/Dockerfile`
+  (repo root as build context). The demo honors the platform's `PORT`
+  variable; a ready-made [`render.yaml`](render.yaml) blueprint is included.
+
+## Project layout
+
+```
+sentinel/
+├── core/            monitor.py · drift.py · alerts.py · metrics.py
+├── dashboard/       app.py (FastAPI) · templates/ · static/ (vendored Chart.js)
+├── storage/         backend.py (ABC · in-memory · SQLite)
+├── integrations/    sklearn.py
+└── cli/             commands.py (Click + Rich)
+tests/               23 tests · seeded, deterministic
+docker/              Dockerfile · docker-compose.yml · prometheus.yml
+```
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -q            # 23 passed
+flake8 sentinel --max-line-length=120
+```
+
+## Want to understand every line?
+
+**[LEARN.md](LEARN.md)** is a from-zero walkthrough of everything this
+project touches — the statistics (what a p-value actually is, why PSI has a
+0.2 threshold, how ADWIN's Hoeffding bound works), the engineering (FastAPI,
+WebSockets, Prometheus internals, Docker networking, CI), with curated video
+picks per topic. If you can read Python, you can rebuild this project from
+that file.
 
 ## License
 
-MIT License - see LICENSE for details.
-
-## Contributing
-
-Contributions are welcome! Please read CONTRIBUTING.md first.
-
----
-
-Made with love for the MLOps community
+MIT — see [LICENSE](LICENSE).

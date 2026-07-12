@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="mlops-sentinel",
-    version="0.2.0",
+    version="0.3.0",
     author="Martian172",
     author_email="martian172@users.noreply.github.com",
     description="Production ML Model Monitoring & Alerting Toolkit",
@@ -25,25 +25,23 @@ setup(
     ],
     python_requires=">=3.10",
     install_requires=[
-        "scikit-learn>=1.3.0",
         "numpy>=1.24.0",
-        "pandas>=2.0.0",
         "scipy>=1.11.0",
         "fastapi>=0.104.0",
         "uvicorn[standard]>=0.24.0",
         "pydantic>=2.0.0",
         "click>=8.1.0",
         "prometheus-client>=0.18.0",
-        "jinja2>=3.1.0",
-        "aiohttp>=3.9.0",
-        "python-dotenv>=1.0.0",
-        "matplotlib>=3.7.0",
-        "seaborn>=0.12.0",
-        "sqlalchemy>=2.0.0",
         "rich>=13.0.0",
+        "httpx>=0.25.0",
     ],
     extras_require={
-        "dev": ["pytest", "pytest-cov", "pytest-asyncio", "flake8", "black", "httpx"],
+        "sklearn": ["scikit-learn>=1.3.0"],
+        "sqlite": ["sqlalchemy>=2.0.0"],
+        "dev": [
+            "pytest", "pytest-cov", "pytest-asyncio", "flake8", "black",
+            "scikit-learn>=1.3.0", "sqlalchemy>=2.0.0",
+        ],
     },
     entry_points={
         "console_scripts": [
@@ -51,7 +49,7 @@ setup(
         ],
     },
     package_data={
-        "sentinel": ["dashboard/templates/*.html"],
+        "sentinel": ["dashboard/templates/*.html", "dashboard/static/*.js"],
     },
     include_package_data=True,
 )
