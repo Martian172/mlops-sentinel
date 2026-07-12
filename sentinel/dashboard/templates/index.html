@@ -1,286 +1,589 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MLOps Sentinel — Model Monitor</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg: #0a0f1e;
-      --surface: #111827;
-      --surface2: #1a2236;
-      --border: #1f2e4a;
-      --accent: #00e5a0;
-      --accent2: #00bcd4;
-      --warn: #f59e0b;
-      --danger: #ef4444;
-      --text: #e2e8f0;
-      --muted: #64748b;
-      --radius: 12px;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SENTINEL — Model Control Room</title>
+<script src="/static/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f5f1e8;
+    --panel: #fcfaf4;
+    --panel2: #f0ebdd;
+    --ink: #16150f;
+    --muted: #8a8270;
+    --line: #d8d1bf;
+    --line-soft: #e6e0d0;
+    --orange: #e84b0c;
+    --green: #177245;
+    --amber: #b7791f;
+    --red: #b3261e;
+    --blue: #2456a6;
+    --mono: 'IBM Plex Mono', 'Consolas', monospace;
+    --disp: 'Space Grotesk', 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scrollbar-gutter: stable; }
+  body {
+    font-family: var(--disp);
+    color: var(--ink);
+    background:
+      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0 / 100% 28px,
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0 / 28px 100%,
+      var(--paper);
+    min-height: 100vh;
+  }
 
-    /* Navbar */
-    .navbar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 2rem; height: 64px;
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 100;
-      backdrop-filter: blur(12px);
-    }
-    .logo { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.1rem; }
-    .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
-    .nav-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--muted); }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  /* ── header ─────────────────────────────────────────────── */
+  header {
+    display: flex; align-items: stretch; gap: 0;
+    border-bottom: 2px solid var(--ink);
+    background: var(--panel);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 22px;
+    border-right: 1px solid var(--line);
+  }
+  .brand-mark {
+    width: 40px; height: 40px; border: 2px solid var(--ink); border-radius: 50%;
+    position: relative; flex: none;
+  }
+  .brand-mark::before {   /* radar sweep */
+    content: ''; position: absolute; inset: 3px; border-radius: 50%;
+    background: conic-gradient(from 0deg, rgba(232,75,12,.55), transparent 110deg);
+    animation: sweep 4s linear infinite;
+  }
+  .brand-mark::after {    /* center dot */
+    content: ''; position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+    background: var(--ink); border-radius: 50%; transform: translate(-50%,-50%);
+  }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .brand h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: .38em; }
+  .brand small { display:block; font-family: var(--mono); font-size: .6rem; letter-spacing:.18em; color: var(--muted); margin-top: 2px; }
+  .head-cell {
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 20px; border-right: 1px solid var(--line);
+    font-family: var(--mono);
+  }
+  .head-cell .k { font-size: .58rem; letter-spacing: .22em; color: var(--muted); text-transform: uppercase; }
+  .head-cell .v { font-size: .95rem; font-weight: 600; margin-top: 3px; white-space: nowrap; }
+  .head-spacer { flex: 1; }
+  .lamp { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,.35);
+          background: #b9b2a0; vertical-align: -1px; margin-right: 7px; }
+  .lamp.on-green  { background: radial-gradient(circle at 35% 30%, #7ee2ae, var(--green)); box-shadow: 0 0 7px rgba(23,114,69,.8); }
+  .lamp.on-amber  { background: radial-gradient(circle at 35% 30%, #ffd98c, var(--amber)); box-shadow: 0 0 7px rgba(183,121,31,.8); }
+  .lamp.on-red    { background: radial-gradient(circle at 35% 30%, #ff9a8c, var(--red)); box-shadow: 0 0 7px rgba(179,38,30,.85); animation: blink 1.1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .45; } }
 
-    /* Layout */
-    .main { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; padding: 1.5rem 2rem; max-width: 1600px; margin: 0 auto; }
-    .left { display: flex; flex-direction: column; gap: 1.5rem; }
+  /* ── status strip ───────────────────────────────────────── */
+  .status-strip {
+    display: flex; align-items: center; gap: 18px;
+    padding: 10px 26px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel2);
+    font-family: var(--mono);
+  }
+  .status-word { font-size: 1.02rem; font-weight: 600; letter-spacing: .26em; }
+  .status-strip .detail { color: var(--muted); font-size: .74rem; letter-spacing: .05em; }
+  .status-strip.nominal .status-word { color: var(--green); }
+  .status-strip.warning { background: repeating-linear-gradient(-45deg, #f4e6c8 0 14px, var(--panel2) 14px 28px); }
+  .status-strip.warning .status-word { color: var(--amber); }
+  .status-strip.critical { background: repeating-linear-gradient(-45deg, #f6d3ca 0 14px, var(--panel2) 14px 28px); }
+  .status-strip.critical .status-word { color: var(--red); }
 
-    /* Stat cards */
-    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-    .card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 1.25rem 1.5rem; transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,229,160,0.08); }
-    .card-label { font-size: 0.75rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-    .card-value { font-size: 2rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
-    .card-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
-    .card.green .card-value { color: var(--accent); }
-    .card.cyan .card-value { color: var(--accent2); }
-    .card.warn .card-value { color: var(--warn); }
-    .card.danger .card-value { color: var(--danger); }
+  /* ── layout ─────────────────────────────────────────────── */
+  .wrap { max-width: 1560px; margin: 0 auto; padding: 22px 26px 40px; }
+  .grid-main { display: grid; grid-template-columns: 1fr 330px; gap: 20px; }
+  .col-left { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 
-    /* Charts */
-    .chart-panel {
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 1.5rem;
-    }
-    .panel-title { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
-    .panel-title::before { content: ''; width: 3px; height: 1em; background: var(--accent); border-radius: 2px; }
-    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  /* panels with technical-drawing corner ticks */
+  .panel {
+    position: relative; background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 18px 20px;
+  }
+  .panel::before, .panel::after,
+  .panel .tick-b::before, .panel .tick-b::after {
+    content: ''; position: absolute; width: 9px; height: 9px; pointer-events: none;
+  }
+  .panel::before { top: -1px; left: -1px; border-top: 2px solid var(--ink); border-left: 2px solid var(--ink); }
+  .panel::after  { top: -1px; right: -1px; border-top: 2px solid var(--ink); border-right: 2px solid var(--ink); }
+  .panel .tick-b::before { bottom: -1px; left: -1px; border-bottom: 2px solid var(--ink); border-left: 2px solid var(--ink); }
+  .panel .tick-b::after  { bottom: -1px; right: -1px; border-bottom: 2px solid var(--ink); border-right: 2px solid var(--ink); }
+  .panel h2 {
+    font-family: var(--mono); font-size: .62rem; font-weight: 600;
+    letter-spacing: .24em; text-transform: uppercase; color: var(--muted);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .panel h2 .idx { color: var(--orange); }
 
-    /* Alert feed */
-    .alerts-panel {
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; height: fit-content;
-      position: sticky; top: 80px;
-    }
-    .alert-item {
-      background: var(--surface2); border-radius: 8px; padding: 0.75rem 1rem;
-      border-left: 3px solid var(--accent); animation: slideIn 0.3s ease;
-      font-size: 0.82rem;
-    }
-    @keyframes slideIn { from{transform:translateX(20px);opacity:0} to{transform:translateX(0);opacity:1} }
-    .alert-item.warn { border-color: var(--warn); }
-    .alert-item.danger { border-color: var(--danger); }
-    .alert-time { color: var(--muted); font-size: 0.72rem; margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace; }
-    .badge { display: inline-flex; align-items: center; font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; margin-right: 0.4rem; }
-    .badge.info { background: rgba(0,229,160,0.15); color: var(--accent); }
-    .badge.warn { background: rgba(245,158,11,0.15); color: var(--warn); }
-    .badge.crit { background: rgba(239,68,68,0.15); color: var(--danger); }
+  /* instruments row */
+  .instruments { display: grid; grid-template-columns: 1.35fr repeat(5, 1fr); gap: 14px; }
+  .inst { text-align: left; }
+  .inst .val { font-family: var(--mono); font-size: 1.75rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .inst .sub { font-family: var(--mono); font-size: .66rem; color: var(--muted); margin-top: 6px; letter-spacing: .04em; }
+  .inst .val.ok { color: var(--green); } .inst .val.warn { color: var(--amber); } .inst .val.bad { color: var(--red); }
+  .gauge-box { display: flex; gap: 14px; align-items: center; }
+  .gauge-box svg { flex: none; }
 
-    /* Log input */
-    .log-form {
-      background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 1rem 1.5rem;
-    }
-    .log-form textarea {
-      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-      color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
-      padding: 0.75rem; resize: vertical; min-height: 80px; outline: none;
-    }
-    .log-form textarea:focus { border-color: var(--accent); }
-    .btn {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      background: var(--accent); color: #0a0f1e; font-weight: 600; font-size: 0.85rem;
-      padding: 0.5rem 1.2rem; border: none; border-radius: 8px; cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s; margin-top: 0.75rem;
-    }
-    .btn:hover { opacity: 0.9; transform: scale(1.02); }
+  .charts-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+  .charts-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .chart-holder { position: relative; height: 235px; }
+  .chart-holder.short { height: 190px; }
 
-    canvas { max-height: 220px; }
+  /* feature table */
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: .74rem; }
+  th { text-align: left; font-weight: 600; font-size: .6rem; letter-spacing: .18em; text-transform: uppercase;
+       color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--ink); }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .shift-arrow { color: var(--orange); font-weight: 600; }
+  .pill { font-size: .6rem; font-weight: 600; letter-spacing: .1em; padding: 2px 8px; border: 1px solid currentColor; }
+  .pill.ok { color: var(--green); } .pill.bad { color: var(--red); }
 
-    @media (max-width: 1024px) {
-      .main { grid-template-columns: 1fr; }
-      .cards { grid-template-columns: repeat(2, 1fr); }
-      .charts-row { grid-template-columns: 1fr; }
-    }
-  </style>
+  /* right rail */
+  .rail { display: flex; flex-direction: column; gap: 20px; }
+  .feed { display: flex; flex-direction: column; gap: 0; max-height: 460px; overflow-y: auto; }
+  .feed-item { display: flex; gap: 10px; padding: 9px 2px; border-bottom: 1px dashed var(--line); font-size: .76rem; }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-item .lamp { margin-top: 3px; flex: none; }
+  .feed-item .t { font-family: var(--mono); font-size: .62rem; color: var(--muted); margin-top: 3px; }
+  .feed-empty { font-family: var(--mono); font-size: .72rem; color: var(--muted); padding: 12px 0; }
+
+  textarea {
+    width: 100%; background: #fffef9; border: 1px solid var(--line);
+    font-family: var(--mono); font-size: .72rem; color: var(--ink);
+    padding: 10px; min-height: 86px; resize: vertical; outline: none;
+  }
+  textarea:focus { border-color: var(--orange); }
+  .btn {
+    margin-top: 10px; font-family: var(--mono); font-size: .7rem; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase;
+    background: var(--ink); color: var(--paper); border: none; padding: 9px 18px; cursor: pointer;
+  }
+  .btn:hover { background: var(--orange); }
+  .form-note { font-family: var(--mono); font-size: .64rem; color: var(--muted); margin-top: 8px; }
+
+  footer {
+    max-width: 1560px; margin: 0 auto; padding: 0 26px 30px;
+    display: flex; gap: 22px; align-items: center;
+    font-family: var(--mono); font-size: .66rem; color: var(--muted); letter-spacing: .06em;
+  }
+  footer a { color: var(--blue); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  footer .sep { flex: 1; border-top: 1px dashed var(--line); }
+
+  @media (max-width: 1250px) {
+    .instruments { grid-template-columns: 1fr 1fr 1fr; }
+    .grid-main { grid-template-columns: 1fr; }
+    .charts-row, .charts-row-2 { grid-template-columns: 1fr; }
+  }
+</style>
 </head>
 <body>
-<nav class="navbar">
-  <div class="logo">
-    <div class="logo-icon">🛡</div>
-    <span>MLOps <strong>Sentinel</strong></span>
-  </div>
-  <div class="nav-status">
-    <div class="status-dot"></div>
-    <span id="ws-status">Connecting...</span>
-    &nbsp;|&nbsp; Model: <strong id="model-name">production-v1</strong>
-  </div>
-</nav>
 
-<div class="main">
-  <div class="left">
-    <!-- Stat Cards -->
-    <div class="cards">
-      <div class="card green">
-        <div class="card-label">Health Score</div>
-        <div class="card-value" id="health-score">98.2%</div>
-        <div class="card-sub">↑ 0.4% from yesterday</div>
-      </div>
-      <div class="card cyan">
-        <div class="card-label">Predictions</div>
-        <div class="card-value" id="pred-count">14,207</div>
-        <div class="card-sub">Last 24 hours</div>
-      </div>
-      <div class="card warn">
-        <div class="card-label">Drift Score</div>
-        <div class="card-value" id="drift-score">0.12</div>
-        <div class="card-sub">3 features monitored</div>
-      </div>
-      <div class="card danger">
-        <div class="card-label">Active Alerts</div>
-        <div class="card-value" id="alert-count">2</div>
-        <div class="card-sub">1 critical, 1 warning</div>
-      </div>
-    </div>
-
-    <!-- Performance Chart -->
-    <div class="chart-panel">
-      <div class="panel-title">Model Performance Over Time</div>
-      <canvas id="perfChart"></canvas>
-    </div>
-
-    <!-- Drift + Distribution -->
-    <div class="charts-row">
-      <div class="chart-panel">
-        <div class="panel-title">Feature Drift Scores</div>
-        <canvas id="driftChart"></canvas>
-      </div>
-      <div class="chart-panel">
-        <div class="panel-title">Prediction Distribution</div>
-        <canvas id="distChart"></canvas>
-      </div>
-    </div>
-
-    <!-- Log Prediction -->
-    <div class="log-form">
-      <div class="panel-title" style="margin-bottom:0.75rem">Log a Prediction</div>
-      <textarea id="log-json" placeholder='{"features": {"age": 32, "income": 75000}, "prediction": 1, "actual": 1}'></textarea>
-      <button class="btn" onclick="logPrediction()">⚡ Log Prediction</button>
+<header>
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"></div>
+    <div>
+      <h1>SENTINEL</h1>
+      <small>PRODUCTION MODEL CONTROL ROOM</small>
     </div>
   </div>
+  <div class="head-cell">
+    <span class="k">Model under watch</span>
+    <span class="v" id="h-model">—</span>
+  </div>
+  <div class="head-cell">
+    <span class="k">Task</span>
+    <span class="v" id="h-task">—</span>
+  </div>
+  <div class="head-cell">
+    <span class="k">Uptime</span>
+    <span class="v" id="h-uptime">—</span>
+  </div>
+  <div class="head-spacer"></div>
+  <div class="head-cell">
+    <span class="k">Telemetry link</span>
+    <span class="v"><span class="lamp" id="ws-lamp"></span><span id="ws-text">CONNECTING</span></span>
+  </div>
+  <div class="head-cell" style="border-right:none">
+    <span class="k">UTC</span>
+    <span class="v" id="h-clock">—</span>
+  </div>
+</header>
 
-  <!-- Alert Feed -->
-  <div class="alerts-panel">
-    <div class="panel-title">Live Alert Feed</div>
-    <div id="alerts-list">
-      <div class="alert-item info">
-        <span class="badge info">INFO</span>Model loaded successfully
-        <div class="alert-time">14:08:03</div>
+<div class="status-strip nominal" id="status-strip">
+  <span class="status-word" id="status-word">STANDING BY</span>
+  <span class="detail" id="status-detail">waiting for first telemetry…</span>
+</div>
+
+<div class="wrap">
+  <div class="grid-main">
+    <div class="col-left">
+
+      <!-- instruments -->
+      <section class="panel"><span class="tick-b"></span>
+        <h2><span class="idx">01</span> Instruments</h2>
+        <div class="instruments">
+          <div class="inst gauge-box">
+            <svg id="gauge" width="120" height="72" viewBox="0 0 120 72">
+              <path d="M 10 66 A 50 50 0 0 1 110 66" fill="none" stroke="#e0d9c6" stroke-width="8" stroke-linecap="round"/>
+              <path id="gauge-arc" d="M 10 66 A 50 50 0 0 1 110 66" fill="none" stroke="#177245" stroke-width="8"
+                    stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="157"/>
+              <g id="gauge-needle" transform="rotate(-90 60 66)">
+                <line x1="60" y1="66" x2="60" y2="26" stroke="#16150f" stroke-width="2.5"/>
+              </g>
+              <circle cx="60" cy="66" r="4.5" fill="#16150f"/>
+            </svg>
+            <div>
+              <div class="val" id="v-health">—</div>
+              <div class="sub">HEALTH INDEX</div>
+            </div>
+          </div>
+          <div class="inst"><div class="val" id="v-acc">—</div><div class="sub">ACCURACY</div></div>
+          <div class="inst"><div class="val" id="v-drift">—</div><div class="sub">DRIFT SCORE · trip&nbsp;0.50</div></div>
+          <div class="inst"><div class="val" id="v-preds">0</div><div class="sub">PREDICTIONS · <span id="v-ppm">0</span>/min</div></div>
+          <div class="inst"><div class="val" id="v-p95">—</div><div class="sub">P95 LATENCY</div></div>
+          <div class="inst"><div class="val" id="v-alerts">0</div><div class="sub">ALERTS FIRED</div></div>
+        </div>
+      </section>
+
+      <!-- main charts -->
+      <div class="charts-row">
+        <section class="panel"><span class="tick-b"></span>
+          <h2><span class="idx">02</span> Accuracy over time · 20-prediction buckets</h2>
+          <div class="chart-holder"><canvas id="chart-acc"></canvas></div>
+        </section>
+        <section class="panel"><span class="tick-b"></span>
+          <h2><span class="idx">03</span> Feature drift · PSI (trip 0.20)</h2>
+          <div class="chart-holder"><canvas id="chart-psi"></canvas></div>
+        </section>
       </div>
-      <div class="alert-item warn">
-        <span class="badge warn">WARN</span>Feature drift detected: <code>age</code> (PSI=0.18)
-        <div class="alert-time">14:05:41</div>
+
+      <div class="charts-row-2">
+        <section class="panel"><span class="tick-b"></span>
+          <h2><span class="idx">04</span> Prediction mix</h2>
+          <div class="chart-holder short"><canvas id="chart-mix"></canvas></div>
+        </section>
+        <section class="panel"><span class="tick-b"></span>
+          <h2><span class="idx">05</span> Latency · last 100 requests (ms)</h2>
+          <div class="chart-holder short"><canvas id="chart-lat"></canvas></div>
+        </section>
       </div>
-      <div class="alert-item danger">
-        <span class="badge crit">CRIT</span>Accuracy dropped below 90% threshold
-        <div class="alert-time">13:52:17</div>
-      </div>
+
+      <!-- feature detail -->
+      <section class="panel"><span class="tick-b"></span>
+        <h2><span class="idx">06</span> Feature inspection · baseline vs production</h2>
+        <table>
+          <thead>
+            <tr><th>Feature</th><th>Test</th><th>Baseline μ</th><th></th><th>Production μ</th>
+                <th>p-value</th><th>PSI</th><th>Verdict</th></tr>
+          </thead>
+          <tbody id="feature-rows">
+            <tr><td colspan="8" style="color:var(--muted)">awaiting drift telemetry…</td></tr>
+          </tbody>
+        </table>
+      </section>
     </div>
+
+    <!-- right rail -->
+    <aside class="rail">
+      <section class="panel"><span class="tick-b"></span>
+        <h2><span class="idx">07</span> Alert log</h2>
+        <div class="feed" id="alert-feed">
+          <div class="feed-empty">no alerts fired — system quiet</div>
+        </div>
+      </section>
+
+      <section class="panel"><span class="tick-b"></span>
+        <h2><span class="idx">08</span> Manual telemetry entry</h2>
+        <textarea id="log-json" spellcheck="false">{"features": {"age": 34, "income": 72000, "credit_score": 655}, "prediction": 0, "actual": 0}</textarea>
+        <button class="btn" onclick="logPrediction()">Transmit</button>
+        <div class="form-note" id="form-note">POST /api/log — one prediction record</div>
+      </section>
+    </aside>
   </div>
 </div>
 
+<footer>
+  <span>SENTINEL v0.3.0</span>
+  <span class="sep"></span>
+  <a href="/docs">API console</a>
+  <a href="/metrics">prometheus /metrics</a>
+  <a href="https://github.com/Martian172/mlops-sentinel">source</a>
+</footer>
+
 <script>
-  // ── Charts ──────────────────────────────────────────────────────────
-  const hours = Array.from({length:24}, (_,i) => `${String(i).padStart(2,'0')}:00`);
-  const perfCtx = document.getElementById('perfChart').getContext('2d');
-  new Chart(perfCtx, {
+/* ══════════════════════════════════════════════════════════════
+   SENTINEL control-room front-end.
+   Every number on this page comes from the live REST API:
+     /api/snapshot     cards, lamps, gauge, mix, latency   (4 s)
+     /api/performance  accuracy line                       (10 s)
+     /api/drift        PSI bars + feature table + status   (10 s)
+     /api/alerts       alert log                           (6 s)
+   ══════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const fmtPct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%');
+const fmtNum = v => (v == null ? '—' : Number(v).toLocaleString());
+
+async function getJSON(path) {
+  try {
+    const r = await fetch(path);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (_) { return null; }
+}
+
+/* ── charts (styled to the instrument-panel system) ─────────── */
+const INK = '#16150f', MUTED = '#8a8270', GRID = '#e6e0d0',
+      ORANGE = '#e84b0c', GREEN = '#177245', RED = '#b3261e', AMBER = '#b7791f', BLUE = '#2456a6';
+let accChart, psiChart, mixChart, latChart;
+
+if (window.Chart) {
+  Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+  Chart.defaults.font.size = 10;
+  Chart.defaults.color = MUTED;
+
+  accChart = new Chart($('chart-acc'), {
     type: 'line',
-    data: {
-      labels: hours,
-      datasets: [
-        { label: 'Accuracy', data: hours.map(()=>0.88+Math.random()*0.10), borderColor:'#00e5a0', tension:0.4, fill:true, backgroundColor:'rgba(0,229,160,0.05)', borderWidth:2, pointRadius:0 },
-        { label: 'F1 Score', data: hours.map(()=>0.85+Math.random()*0.10), borderColor:'#00bcd4', tension:0.4, fill:false, borderWidth:2, pointRadius:0 },
-      ]
+    data: { labels: [], datasets: [{
+      label: 'accuracy', data: [], borderColor: INK, backgroundColor: 'rgba(232,75,12,.07)',
+      borderWidth: 1.6, pointRadius: 0, tension: .25, fill: true, stepped: false,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: GRID }, ticks: { maxTicksLimit: 8 } },
+        y: { min: 0.5, max: 1.0, grid: { color: GRID }, ticks: { callback: v => (v*100).toFixed(0) + '%' } },
+      },
     },
-    options: { responsive:true, plugins:{legend:{labels:{color:'#94a3b8'}}}, scales:{x:{ticks:{color:'#64748b'},grid:{color:'#1f2e4a'}},y:{ticks:{color:'#64748b'},grid:{color:'#1f2e4a'},min:0.7,max:1.0}} }
   });
 
-  const driftCtx = document.getElementById('driftChart').getContext('2d');
-  new Chart(driftCtx, {
-    type: 'bar',
-    data: {
-      labels: ['age', 'income', 'score', 'tenure', 'region'],
-      datasets: [{ label: 'PSI Score', data: [0.18, 0.07, 0.03, 0.12, 0.05], backgroundColor: ['#ef4444','#00e5a0','#00e5a0','#f59e0b','#00e5a0'], borderRadius:6 }]
+  psiChart = new Chart($('chart-psi'), {
+    data: { labels: [], datasets: [
+      { type: 'bar', label: 'PSI', data: [], backgroundColor: [], borderColor: INK, borderWidth: 1, maxBarThickness: 52 },
+      { type: 'line', label: 'trip 0.20', data: [], borderColor: RED, borderDash: [6, 5], borderWidth: 1.2, pointRadius: 0 },
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, suggestedMax: 0.4, grid: { color: GRID } } },
     },
-    options: { responsive:true, plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#64748b'},grid:{color:'#1f2e4a'}},y:{ticks:{color:'#64748b'},grid:{color:'#1f2e4a'},max:0.3}} }
   });
 
-  const distCtx = document.getElementById('distChart').getContext('2d');
-  new Chart(distCtx, {
+  mixChart = new Chart($('chart-mix'), {
     type: 'doughnut',
-    data: {
-      labels: ['Class 0', 'Class 1'],
-      datasets: [{ data: [38, 62], backgroundColor: ['#1f2e4a','#00e5a0'], borderColor:['#0a0f1e','#0a0f1e'], borderWidth:3 }]
-    },
-    options: { responsive:true, plugins:{legend:{labels:{color:'#94a3b8'}}} }
+    data: { labels: [], datasets: [{ data: [], backgroundColor: ['#16150f', '#e84b0c', '#2456a6', '#b7791f', '#177245'],
+                                     borderColor: '#fcfaf4', borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: '62%',
+               plugins: { legend: { position: 'right' } } },
   });
 
-  // ── WebSocket ────────────────────────────────────────────────────────
-  const wsStatus = document.getElementById('ws-status');
-  let ws;
-  function connectWS() {
-    ws = new WebSocket(`ws://${location.host}/ws`);
-    ws.onopen = () => wsStatus.textContent = 'Live';
-    ws.onclose = () => { wsStatus.textContent = 'Disconnected'; setTimeout(connectWS, 3000); };
-    ws.onmessage = e => {
-      const data = JSON.parse(e.data);
-      if (data.event === 'prediction_logged') refreshMetrics();
-    };
-  }
-  connectWS();
+  latChart = new Chart($('chart-lat'), {
+    type: 'line',
+    data: { labels: [], datasets: [{
+      data: [], borderColor: BLUE, borderWidth: 1.3, pointRadius: 0, tension: .3, fill: false,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { display: false }, y: { beginAtZero: true, grid: { color: GRID } } },
+    },
+  });
+}
 
-  // ── API ──────────────────────────────────────────────────────────────
-  async function refreshMetrics() {
-    try {
-      const r = await fetch('/api/metrics');
-      if (r.ok) { const d = await r.json(); console.log('Metrics:', d); }
-    } catch(_) {}
+/* ── system status ──────────────────────────────────────────── */
+let lastSnapshot = null, lastDrift = null;
+
+function renderStatus() {
+  const strip = $('status-strip'), word = $('status-word'), detail = $('status-detail');
+  const s = lastSnapshot, d = lastDrift;
+  if (!s) return;
+
+  const acc = s.accuracy, drift = s.drift_score ?? 0;
+  const concept = s.concept_drift_detected;
+  const covariate = d && d.is_drifted;
+
+  strip.classList.remove('nominal', 'warning', 'critical');
+  if (concept || (acc != null && acc < 0.80) || drift > 0.6) {
+    strip.classList.add('critical');
+    word.textContent = 'CRITICAL — INTERVENTION ADVISED';
+    detail.textContent = concept
+      ? `concept drift confirmed by ${s.concept_drift_method} — the world changed, consider retraining`
+      : `accuracy ${fmtPct(acc)} · drift ${drift.toFixed(2)}`;
+  } else if (covariate || drift > 0.4 || (acc != null && acc < 0.88)) {
+    strip.classList.add('warning');
+    word.textContent = 'DEGRADED — DRIFT ON INSTRUMENTS';
+    const feats = d && d.drifted_features && d.drifted_features.length ? ` · drifted: ${d.drifted_features.join(', ')}` : '';
+    detail.textContent = `accuracy ${fmtPct(acc)} · drift score ${drift.toFixed(2)}${feats}`;
+  } else {
+    strip.classList.add('nominal');
+    word.textContent = 'ALL SYSTEMS NOMINAL';
+    detail.textContent = `accuracy ${fmtPct(acc)} · drift score ${drift.toFixed(2)} · inputs match baseline`;
+  }
+}
+
+/* ── snapshot → instruments ─────────────────────────────────── */
+function classify(el, v, okAbove, warnAbove) {
+  el.classList.remove('ok', 'warn', 'bad');
+  if (v == null) return;
+  if (v >= okAbove) el.classList.add('ok');
+  else if (v >= warnAbove) el.classList.add('warn');
+  else el.classList.add('bad');
+}
+
+async function pollSnapshot() {
+  const s = await getJSON('/api/snapshot');
+  if (!s || s.status === 'no_monitor') return;
+  lastSnapshot = s;
+
+  $('h-model').textContent = s.model_name || '—';
+  $('h-task').textContent = (s.task_type || '—').toUpperCase();
+  if (s.uptime_seconds != null) {
+    const t = Math.floor(s.uptime_seconds);
+    $('h-uptime').textContent = `T+${String(Math.floor(t/3600)).padStart(2,'0')}:${String(Math.floor(t%3600/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;
   }
 
-  async function logPrediction() {
-    const raw = document.getElementById('log-json').value.trim();
-    if (!raw) return;
-    try {
-      const payload = JSON.parse(raw);
-      const r = await fetch('/api/log', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      const d = await r.json();
-      if (d.status === 'logged') addAlert('info', 'Prediction logged ✓');
-    } catch(e) { addAlert('danger', 'Invalid JSON: ' + e.message); }
+  const health = s.health_score;
+  $('v-health').textContent = health == null ? '—' : (health * 100).toFixed(0);
+  classify($('v-health'), health, 0.85, 0.7);
+  if (health != null) {
+    const arc = $('gauge-arc'), needle = $('gauge-needle');
+    arc.style.strokeDashoffset = 157 * (1 - health);
+    arc.setAttribute('stroke', health >= 0.85 ? GREEN : health >= 0.7 ? AMBER : RED);
+    needle.setAttribute('transform', `rotate(${-90 + 180 * health} 60 66)`);
   }
 
-  function addAlert(type, msg) {
-    const list = document.getElementById('alerts-list');
-    const el = document.createElement('div');
-    el.className = `alert-item ${type === 'info' ? 'info' : 'danger'}`;
-    const badge = type === 'info' ? '<span class="badge info">INFO</span>' : '<span class="badge crit">ERROR</span>';
-    el.innerHTML = `${badge}${msg}<div class="alert-time">${new Date().toLocaleTimeString()}</div>`;
-    list.prepend(el);
+  $('v-acc').textContent = fmtPct(s.accuracy);
+  classify($('v-acc'), s.accuracy, 0.9, 0.85);
+  $('v-drift').textContent = s.drift_score == null ? '—' : s.drift_score.toFixed(2);
+  classify($('v-drift'), s.drift_score == null ? null : 1 - s.drift_score, 0.7, 0.5);
+  $('v-preds').textContent = fmtNum(s.total_predictions);
+  $('v-ppm').textContent = Math.round(s.predictions_per_minute || 0);
+  $('v-p95').textContent = s.p95_latency_ms ? s.p95_latency_ms.toFixed(0) + 'ms' : '—';
+  $('v-alerts').textContent = fmtNum(s.alert_count);
+  classify($('v-alerts'), s.alert_count === 0 ? 1 : 0, 1, 1);
+
+  if (mixChart && s.prediction_counts_by_class) {
+    const entries = Object.entries(s.prediction_counts_by_class).sort();
+    mixChart.data.labels = entries.map(([k]) => 'class ' + k);
+    mixChart.data.datasets[0].data = entries.map(([, v]) => v);
+    mixChart.update();
+  }
+  if (latChart && s.latency_history) {
+    latChart.data.labels = s.latency_history.map((_, i) => i);
+    latChart.data.datasets[0].data = s.latency_history;
+    latChart.update();
+  }
+  renderStatus();
+}
+
+/* ── performance history → accuracy line ────────────────────── */
+async function pollPerformance() {
+  const p = await getJSON('/api/performance?bucket_size=20');
+  if (!p || !p.history || !accChart) return;
+  const h = p.history.slice(-40);
+  accChart.data.labels = h.map(b => new Date(b.timestamp).toLocaleTimeString('en-GB', { hour12: false }));
+  accChart.data.datasets[0].data = h.map(b => b.accuracy);
+  accChart.update();
+}
+
+/* ── drift report → bars + table ────────────────────────────── */
+async function pollDrift() {
+  const d = await getJSON('/api/drift');
+  if (!d || d.drift_score == null) return;
+  lastDrift = d;
+
+  const stats = d.feature_stats || [];
+  if (psiChart) {
+    psiChart.data.labels = stats.map(s => s.feature);
+    psiChart.data.datasets[0].data = stats.map(s => s.psi_score ?? 0);
+    psiChart.data.datasets[0].backgroundColor = stats.map(s => s.is_drifted ? 'rgba(179,38,30,.75)' : 'rgba(23,114,69,.55)');
+    psiChart.data.datasets[1].data = stats.map(() => 0.2);
+    psiChart.update();
   }
 
-  // ── Live counter animation ────────────────────────────────────────────
-  setInterval(() => {
-    const el = document.getElementById('pred-count');
-    el.textContent = (parseInt(el.textContent.replace(/,/g,'')) + Math.floor(Math.random()*5)).toLocaleString();
-  }, 3000);
+  const rows = stats.map(s => {
+    const arrow = s.baseline_mean != null && s.production_mean != null && Math.abs(s.production_mean - s.baseline_mean) > 1e-9
+      ? (s.production_mean > s.baseline_mean ? '▲' : '▼') : '·';
+    return `<tr>
+      <td><strong>${s.feature}</strong></td>
+      <td>${(s.test_type || '').toUpperCase()}</td>
+      <td>${s.baseline_mean == null ? '—' : s.baseline_mean.toFixed(2)}</td>
+      <td class="shift-arrow">${arrow}</td>
+      <td>${s.production_mean == null ? '—' : s.production_mean.toFixed(2)}</td>
+      <td>${s.p_value == null ? '—' : s.p_value.toFixed(4)}</td>
+      <td>${s.psi_score == null ? '—' : s.psi_score.toFixed(3)}</td>
+      <td><span class="pill ${s.is_drifted ? 'bad' : 'ok'}">${s.is_drifted ? 'DRIFTED' : 'STABLE'}</span></td>
+    </tr>`;
+  }).join('');
+  $('feature-rows').innerHTML = rows || '<tr><td colspan="8" style="color:var(--muted)">no features</td></tr>';
+  renderStatus();
+}
+
+/* ── alerts → feed ──────────────────────────────────────────── */
+async function pollAlerts() {
+  const a = await getJSON('/api/alerts');
+  if (!a) return;
+  const feed = $('alert-feed');
+  if (!a.alerts || a.alerts.length === 0) {
+    feed.innerHTML = '<div class="feed-empty">no alerts fired — system quiet</div>';
+    return;
+  }
+  feed.innerHTML = a.alerts.slice(0, 14).map(al => {
+    const lamp = al.severity === 'CRITICAL' ? 'on-red' : al.severity === 'WARNING' ? 'on-amber' : 'on-green';
+    const ts = (al.timestamp || '').replace('T', ' ').slice(0, 19);
+    return `<div class="feed-item">
+      <span class="lamp ${lamp}"></span>
+      <div><strong>${al.title || al.severity}</strong><br/>${al.message || ''}<div class="t">${ts} UTC</div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ── manual entry ───────────────────────────────────────────── */
+async function logPrediction() {
+  const note = $('form-note');
+  try {
+    const payload = JSON.parse($('log-json').value);
+    const r = await fetch('/api/log', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    note.textContent = d.status === 'logged' ? '✓ record transmitted' : '✗ ' + (d.status || 'failed');
+    pollSnapshot();
+  } catch (e) { note.textContent = '✗ invalid JSON: ' + e.message; }
+}
+
+/* ── websocket link lamp ────────────────────────────────────── */
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = () => { $('ws-lamp').className = 'lamp on-green'; $('ws-text').textContent = 'LIVE'; };
+  ws.onclose = () => {
+    $('ws-lamp').className = 'lamp on-red'; $('ws-text').textContent = 'RETRY';
+    setTimeout(connectWS, 3000);
+  };
+  ws.onmessage = e => {
+    try { if (JSON.parse(e.data).event === 'prediction_logged') pollSnapshot(); } catch (_) {}
+  };
+}
+
+/* ── clock + schedulers ─────────────────────────────────────── */
+setInterval(() => {
+  $('h-clock').textContent = new Date().toISOString().slice(11, 19);
+}, 1000);
+
+connectWS();
+pollSnapshot(); pollPerformance(); pollDrift(); pollAlerts();
+setInterval(pollSnapshot, 4000);
+setInterval(pollPerformance, 10000);
+setInterval(pollDrift, 10000);
+setInterval(pollAlerts, 6000);
 </script>
 </body>
 </html>

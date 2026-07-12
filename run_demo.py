@@ -53,14 +53,18 @@ set_monitor(monitor)
 
 
 # --- 3. Simulated production traffic ---------------------------------------
+DRIFT_AFTER_MIN = float(os.environ.get("SENTINEL_DRIFT_MIN", "2"))
+
+
 def simulate_traffic() -> None:
-    """Log a prediction every ~0.5s. After 2 minutes, drift sets in:
-    customers get younger and richer, and model accuracy degrades."""
+    """Log a prediction every ~0.5s. After SENTINEL_DRIFT_MIN minutes
+    (default 2), drift sets in: customers get younger and richer, and
+    model accuracy degrades."""
     start = time.time()
     while True:
         minutes_elapsed = (time.time() - start) / 60
-        # Healthy for the first 2 minutes, then drift ramps 0 → 1 over 2 min
-        drift = min(max(minutes_elapsed - 2, 0.0) / 2, 1.0)
+        # Healthy at first, then drift ramps 0 → 1 over 2 minutes
+        drift = min(max(minutes_elapsed - DRIFT_AFTER_MIN, 0.0) / 2, 1.0)
 
         features = {
             "age": float(np.random.normal(40 - 12 * drift, 10)),
@@ -85,7 +89,9 @@ threading.Thread(target=simulate_traffic, daemon=True).start()
 
 if __name__ == "__main__":
     host = os.environ.get("SENTINEL_HOST", "127.0.0.1")
-    port = int(os.environ.get("SENTINEL_PORT", "8001"))
+    # PORT is the convention on cloud platforms (Render, Railway, HF Spaces)
+    port = int(os.environ.get("SENTINEL_PORT", os.environ.get("PORT", "8001")))
     print(f"MLOps Sentinel demo dashboard: http://{host}:{port}")
-    print("Simulated predictions are streaming in; drift begins after ~2 minutes.")
+    print(f"Simulated predictions are streaming in; "
+          f"drift begins after ~{DRIFT_AFTER_MIN:g} minute(s).")
     uvicorn.run(app, host=host, port=port)

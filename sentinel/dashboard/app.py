@@ -9,10 +9,11 @@ from typing import Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # Lazy import to avoid circular deps
-app = FastAPI(title="MLOps Sentinel Dashboard", version="0.2.0")
+app = FastAPI(title="MLOps Sentinel Dashboard", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +27,9 @@ _monitor = None
 _connected_clients: list[WebSocket] = []
 
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
+STATIC_PATH = Path(__file__).parent / "static"
+if STATIC_PATH.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_PATH)), name="static")
 
 
 class PredictionLog(BaseModel):
@@ -81,7 +85,7 @@ async def get_performance(bucket_size: int = 20):
     )
     history = []
     for i in range(0, len(labeled), bucket_size):
-        chunk = labeled[i : i + bucket_size]
+        chunk = labeled[i:i + bucket_size]
         correct = sum(1 for r in chunk if r.prediction == r.actual)
         history.append({
             "timestamp": chunk[-1].timestamp.isoformat(),
@@ -110,9 +114,28 @@ async def log_prediction(payload: PredictionLog):
     return {"status": "no_monitor"}
 
 
+@app.get("/api/snapshot")
+async def get_snapshot():
+    """Cheap point-in-time snapshot for live dashboard cards (no recompute)."""
+    if _monitor is None:
+        return {"status": "no_monitor"}
+    snap = _monitor.metrics_collector.get_snapshot().to_dict()
+    summary_extras = {
+        "uptime_seconds": (
+            time.time() - _monitor._start_time.timestamp()
+        ),
+        "task_type": _monitor.task_type,
+        "concept_drift_detected": _monitor._concept_drift_detected,
+        "concept_drift_method": _monitor._concept_drift_method,
+        "feature_names": _monitor.feature_names,
+    }
+    snap.update(summary_extras)
+    return snap
+
+
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "0.2.0", "timestamp": time.time()}
+    return {"status": "ok", "version": "0.3.0", "timestamp": time.time()}
 
 
 @app.get("/metrics", response_class=PlainTextResponse)
