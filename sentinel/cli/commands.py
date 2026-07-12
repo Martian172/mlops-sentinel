@@ -36,7 +36,7 @@ def monitor_start(host, port, reload):
     """Start the monitoring dashboard server."""
     import uvicorn
     from sentinel.dashboard.app import app
-    console.print(f"[bold green]🛡️  MLOps Sentinel Dashboard[/bold green]")
+    console.print("[bold green]🛡️  MLOps Sentinel Dashboard[/bold green]")
     console.print(f"[cyan]  → http://{host}:{port}[/cyan]")
     uvicorn.run(app, host=host, port=port, reload=reload)
 
@@ -173,11 +173,52 @@ def alerts_list():
 
 
 @alerts.command("test")
-@click.option("--channel", default="log", type=click.Choice(["log", "webhook", "slack"]))
-def alerts_test(channel):
-    """Send a test alert."""
-    console.print(f"[yellow]⚡ Sending test alert via {channel}...[/yellow]")
-    console.print("[green]✓ Test alert sent successfully![/green]")
+@click.option("--slack-webhook", default=None, help="Slack incoming-webhook URL to deliver to.")
+@click.option("--webhook", default=None, help="Generic HTTP webhook URL to deliver to.")
+@click.option("--severity", default="INFO",
+              type=click.Choice(["INFO", "WARNING", "CRITICAL"]), show_default=True)
+def alerts_test(slack_webhook, webhook, severity):
+    """Fire a real test alert through the alerting pipeline."""
+    import uuid
+    from datetime import datetime, timezone
+
+    from sentinel.core.alerts import (
+        Alert, AlertManager, AlertSeverity, SlackAlertChannel, WebhookAlertChannel,
+    )
+
+    manager = AlertManager()
+    if slack_webhook:
+        manager.add_channel(SlackAlertChannel(webhook_url=slack_webhook))
+    if webhook:
+        manager.add_channel(WebhookAlertChannel(url=webhook))
+
+    alert = Alert(
+        id=f"test-{uuid.uuid4().hex[:8]}",
+        title="Sentinel Test Alert",
+        message="This is a test alert fired from `sentinel alerts test`. "
+                "If you can read this, the channel works.",
+        severity=AlertSeverity(severity),
+        timestamp=datetime.now(timezone.utc),
+        model_name="cli-test",
+    )
+
+    n_channels = len(manager._channels)
+    if n_channels == 0:
+        console.print("[yellow]No channels configured — rendering the alert locally.[/yellow]")
+        console.print("[dim]Tip: pass --slack-webhook URL or --webhook URL to test delivery.[/dim]\n")
+        colors = {"INFO": "green", "WARNING": "yellow", "CRITICAL": "red"}
+        color = colors.get(severity, "white")
+        console.print(f"[bold {color}][{severity}][/bold {color}] {alert.title}")
+        console.print(f"  {alert.message}")
+        console.print(f"  [dim]{alert.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}[/dim]")
+        return
+
+    delivered = manager.fire(alert)
+    if delivered == n_channels:
+        console.print(f"[green]✓ Test alert delivered to {delivered}/{n_channels} channel(s).[/green]")
+    else:
+        console.print(f"[red]✗ Delivered to {delivered}/{n_channels} channel(s) — check the logs.[/red]")
+        sys.exit(1)
 
 
 def main():
