@@ -14,8 +14,8 @@ import json
 import logging
 import threading
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -339,10 +339,15 @@ class SQLiteStorage(StorageBackend):
 
     @staticmethod
     def _row_to_record(row: Any) -> PredictionRecord:
+        # SQLite discards timezone info; timestamps are stored as UTC,
+        # so restore awareness on the way out for safe comparisons.
+        ts = row.timestamp
+        if ts is not None and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
         return PredictionRecord(
             id=row.id,
             model_name=row.model_name,
-            timestamp=row.timestamp,
+            timestamp=ts,
             features=json.loads(row.features_json),
             prediction=json.loads(row.prediction_json),
             actual=json.loads(row.actual_json) if row.actual_json is not None else None,

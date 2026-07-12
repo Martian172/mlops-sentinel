@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -276,12 +276,7 @@ class DriftDetector:
         self.drift_score_threshold = drift_score_threshold
         self.n_bins = n_bins
 
-        # Concept drift detectors (one per feature)
         n_features = self.baseline_data.shape[1]
-        self._adwin_detectors: List[ADWIN] = [ADWIN() for _ in range(n_features)]
-        self._ph_detectors: List[PageHinkley] = [
-            PageHinkley() for _ in range(n_features)
-        ]
 
         logger.info(
             "DriftDetector initialised with %d baseline samples, %d features",
@@ -343,7 +338,7 @@ class DriftDetector:
 
         report = DriftReport(
             model_name=model_name,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             drift_score=aggregate_score,
             # Drifted if any feature failed its statistical test, or the
             # aggregate score is high (1 - p_value noise floor is ~0.2 for

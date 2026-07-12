@@ -12,7 +12,6 @@ Provides:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import smtplib
@@ -21,7 +20,7 @@ import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from enum import Enum
@@ -129,12 +128,12 @@ class AlertRule:
         """Return ``True`` if the cooldown period has elapsed."""
         if self._last_fired is None:
             return True
-        elapsed = (datetime.utcnow() - self._last_fired).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - self._last_fired).total_seconds()
         return elapsed >= self.cooldown_seconds
 
     def mark_fired(self) -> None:
         """Record the time the rule last fired."""
-        object.__setattr__(self, "_last_fired", datetime.utcnow())
+        object.__setattr__(self, "_last_fired", datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
@@ -491,7 +490,7 @@ class AlertManager:
         with self._lock:
             self._history.append(alert)
             if len(self._history) > self.max_history:
-                self._history = self._history[-self.max_history :]
+                self._history = self._history[-self.max_history:]
 
         successes = 0
         for channel in self._channels:
@@ -572,11 +571,34 @@ class AlertManager:
                 f"Drifted features: {', '.join(drift_report.drifted_features) or 'none'}."
             ),
             severity=severity,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             model_name=drift_report.model_name,
             metric_name="drift_score",
             metric_value=drift_report.drift_score,
             threshold=0.15,
+        )
+        self.fire(alert)
+        return alert
+
+    def alert_on_concept_drift(self, model_name: str, method: str) -> Alert:
+        """
+        Fire an alert when a streaming detector (ADWIN / Page-Hinkley)
+        reports a shift in the model's error rate.
+        """
+        self._counter += 1
+        alert = Alert(
+            id=f"concept-{self._counter}",
+            title="Concept Drift Detected",
+            message=(
+                f"The {method} detector found a statistically significant shift "
+                f"in the model's error rate. The relationship between inputs and "
+                f"outputs has likely changed — consider retraining."
+            ),
+            severity=AlertSeverity.CRITICAL,
+            timestamp=datetime.now(timezone.utc),
+            model_name=model_name,
+            metric_name="concept_drift",
+            metadata={"method": method},
         )
         self.fire(alert)
         return alert
@@ -604,7 +626,7 @@ class AlertManager:
                 f"{current_value:.4f} (delta: {delta:.4f})."
             ),
             severity=AlertSeverity(severity),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             model_name=model_name,
             metric_name=metric_name,
             metric_value=current_value,
@@ -661,7 +683,7 @@ class AlertManager:
                 f"Current value: {value:.4f}."
             ),
             severity=AlertSeverity(rule.severity),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             model_name=model_name,
             metric_name=rule.metric,
             metric_value=value,

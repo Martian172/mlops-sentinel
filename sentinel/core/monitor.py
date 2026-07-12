@@ -8,16 +8,15 @@ metrics, running drift detection, and triggering alerts.
 from __future__ import annotations
 
 import logging
-import time
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
-from sentinel.core.alerts import AlertManager, AlertRule
-from sentinel.core.drift import DriftDetector, DriftReport
+from sentinel.core.alerts import AlertManager
+from sentinel.core.drift import ADWIN, DriftDetector, DriftReport, PageHinkley
 from sentinel.core.metrics import MetricsCollector
 from sentinel.storage.backend import InMemoryStorage, PredictionRecord, StorageBackend
 
@@ -121,10 +120,17 @@ class ModelMonitor:
         if baseline_data is not None:
             self._init_drift_detector(baseline_data)
 
+        # Streaming concept-drift detectors, fed one error (0/1) per
+        # labeled prediction as it arrives.
+        self._concept_adwin = ADWIN()
+        self._concept_ph = PageHinkley()
+        self._concept_drift_detected: bool = False
+        self._concept_drift_method: Optional[str] = None
+
         # Internal counters
         self._prediction_count: int = 0
         self._error_count: int = 0
-        self._start_time: datetime = datetime.utcnow()
+        self._start_time: datetime = datetime.now(timezone.utc)
 
         # Cache the last computed reports
         self._last_drift_report: Optional[DriftReport] = None
@@ -173,7 +179,7 @@ class ModelMonitor:
             Unique record ID for this prediction.
         """
         record_id = str(uuid.uuid4())
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc)
 
         # Normalise features to a flat dict
         feature_dict = self._normalise_features(features)
@@ -202,6 +208,10 @@ class ModelMonitor:
             prediction=prediction,
             latency_ms=latency_ms,
         )
+
+        # Streaming concept-drift check whenever ground truth is available
+        if actual is not None:
+            self._update_concept_drift(prediction, actual)
 
         # Periodic drift + alert checks
         if (
@@ -268,6 +278,8 @@ class ModelMonitor:
             production_data=production_array,
             feature_names=self.feature_names,
         )
+        report.concept_drift_detected = self._concept_drift_detected
+        report.concept_drift_method = self._concept_drift_method
         self._last_drift_report = report
 
         # Update Prometheus gauge
@@ -302,7 +314,7 @@ class ModelMonitor:
         """
         since: Optional[datetime] = None
         if window_minutes is not None:
-            since = datetime.utcnow() - timedelta(minutes=window_minutes)
+            since = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
 
         records = self.storage.query(
             model_name=self.model_name,
@@ -350,7 +362,7 @@ class ModelMonitor:
 
     def get_summary(self) -> Dict[str, Any]:
         """Return a high-level JSON-serialisable summary."""
-        uptime = (datetime.utcnow() - self._start_time).total_seconds()
+        uptime = (datetime.now(timezone.utc) - self._start_time).total_seconds()
         return {
             "model_name": self.model_name,
             "task_type": self.task_type,
@@ -358,6 +370,8 @@ class ModelMonitor:
             "total_predictions": self._prediction_count,
             "error_count": self._error_count,
             "health_score": self.get_health_score(),
+            "concept_drift_detected": self._concept_drift_detected,
+            "concept_drift_method": self._concept_drift_method,
             "started_at": self._start_time.isoformat(),
         }
 
@@ -414,7 +428,7 @@ class ModelMonitor:
         p99_lat = float(np.percentile(latencies, 99)) if latencies else None
 
         uptime_mins = (
-            (datetime.utcnow() - self._start_time).total_seconds() / 60.0
+            (datetime.now(timezone.utc) - self._start_time).total_seconds() / 60.0
         ) or 1.0
         ppm = total / uptime_mins if total > 0 else 0.0
 
@@ -436,7 +450,7 @@ class ModelMonitor:
 
         return PerformanceReport(
             model_name=self.model_name,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             total_predictions=total,
             labeled_predictions=n_labeled,
             accuracy=accuracy,
@@ -498,20 +512,52 @@ class ModelMonitor:
             mape = None
         return mae, rmse, mape
 
+    def _update_concept_drift(self, prediction: Any, actual: Any) -> None:
+        """Feed one labeled outcome into the streaming concept-drift detectors."""
+        try:
+            error = 0.0 if prediction == actual else 1.0
+        except Exception:  # non-comparable types
+            return
+
+        adwin_hit = self._concept_adwin.add_element(error)
+        ph_hit = self._concept_ph.add_element(error)
+        if not (adwin_hit or ph_hit):
+            return
+
+        method = "ADWIN" if adwin_hit else "PageHinkley"
+        first_detection = not self._concept_drift_detected
+        self._concept_drift_detected = True
+        self._concept_drift_method = method
+        logger.warning(
+            "Concept drift detected by %s after %d predictions",
+            method,
+            self._prediction_count,
+        )
+        if first_detection:
+            try:
+                self.alert_manager.alert_on_concept_drift(self.model_name, method)
+                self.metrics_collector.record_alert()
+            except Exception as exc:  # pragma: no cover
+                logger.error("Concept-drift alert failed: %s", exc)
+
     def _run_drift_check(self) -> None:
         """Periodic internal drift check."""
         try:
             report = self.get_drift_report()
             if report and report.is_drifted:
-                self.alert_manager.alert_on_drift(report)
+                if self.alert_manager.alert_on_drift(report) is not None:
+                    self.metrics_collector.record_alert()
         except Exception as exc:  # pragma: no cover
             logger.error("Drift check failed: %s", exc)
 
     def _run_alert_check(self) -> None:
         """Periodic internal alert rule evaluation."""
         try:
-            if self._last_perf_report is not None:
-                perf_dict = self._last_perf_report.to_dict()
-                self.alert_manager.evaluate_rules(perf_dict)
+            # Compute a fresh report so rules (and the accuracy gauge) always
+            # see current values — a cached report may never exist otherwise.
+            perf_dict = self.get_performance_report()
+            fired = self.alert_manager.evaluate_rules(perf_dict)
+            for _ in fired:
+                self.metrics_collector.record_alert()
         except Exception as exc:  # pragma: no cover
             logger.error("Alert check failed: %s", exc)

@@ -1,5 +1,5 @@
 """Tests for sentinel.core.alerts."""
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sentinel.core.alerts import Alert, AlertManager, AlertRule, AlertSeverity
 
@@ -10,7 +10,7 @@ def make_alert(severity=AlertSeverity.WARNING, message="Test alert"):
         title="Test",
         message=message,
         severity=severity,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         model_name="test-model",
     )
 

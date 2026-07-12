@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,6 @@ try:
         Gauge,
         Histogram,
         generate_latest,
-        CONTENT_TYPE_LATEST,
     )
 
     PROMETHEUS_AVAILABLE = True
@@ -75,6 +74,7 @@ class MetricsSnapshot:
             "alert_count": self.alert_count,
             "health_score": round(self.health_score, 4),
             "prediction_counts_by_class": self.prediction_counts_by_class,
+            "latency_history": [round(v, 2) for v in self.latency_history],
         }
 
 
@@ -111,7 +111,7 @@ class MetricsCollector:
         registry: Optional[Any] = None,
     ) -> None:
         self.model_name = model_name
-        self._start_time = datetime.utcnow()
+        self._start_time = datetime.now(timezone.utc)
         self._start_ts = time.monotonic()
 
         # In-process counters
@@ -223,7 +223,7 @@ class MetricsCollector:
 
         return MetricsSnapshot(
             model_name=self.model_name,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             total_predictions=self._total_predictions,
             predictions_per_minute=round(ppm, 2),
             avg_latency_ms=avg,
@@ -256,17 +256,17 @@ class MetricsCollector:
         # Fallback: manual exposition
         snap = self.get_snapshot()
         lines = [
-            f"# HELP sentinel_predictions_total Total predictions logged",
-            f"# TYPE sentinel_predictions_total counter",
+            "# HELP sentinel_predictions_total Total predictions logged",
+            "# TYPE sentinel_predictions_total counter",
             f'sentinel_predictions_total{{model="{self.model_name}"}} {snap.total_predictions}',
-            f"# HELP sentinel_accuracy Current model accuracy",
-            f"# TYPE sentinel_accuracy gauge",
+            "# HELP sentinel_accuracy Current model accuracy",
+            "# TYPE sentinel_accuracy gauge",
             f'sentinel_accuracy{{model="{self.model_name}"}} {snap.accuracy or 0}',
-            f"# HELP sentinel_drift_score Current drift score",
-            f"# TYPE sentinel_drift_score gauge",
+            "# HELP sentinel_drift_score Current drift score",
+            "# TYPE sentinel_drift_score gauge",
             f'sentinel_drift_score{{model="{self.model_name}"}} {snap.drift_score}',
-            f"# HELP sentinel_alerts_total Total alerts fired",
-            f"# TYPE sentinel_alerts_total counter",
+            "# HELP sentinel_alerts_total Total alerts fired",
+            "# TYPE sentinel_alerts_total counter",
             f'sentinel_alerts_total{{model="{self.model_name}"}} {snap.alert_count}',
         ]
         return "\n".join(lines) + "\n"
