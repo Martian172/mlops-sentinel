@@ -6,11 +6,16 @@
 
 [![CI](https://github.com/Martian172/mlops-sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/Martian172/mlops-sentinel/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.3.0-e84b0c)
+![Version](https://img.shields.io/badge/version-0.4.0-e84b0c)
 ![License](https://img.shields.io/badge/license-MIT-177245)
+
+### ▶ [Live demo](https://mlops-sentinel.onrender.com) · [API console](https://mlops-sentinel.onrender.com/docs)
 
 *Your model was 95% accurate at launch. It's 71% today. Nobody noticed —
 because a decaying model doesn't crash. It just quietly starts being wrong.*
+
+> The live demo runs on Render's free tier, so the first visit after it's been
+> idle may take ~30–50 s to wake up. Give it a moment.
 
 <img src="docs/assets/dashboard.png" alt="Sentinel control-room dashboard catching live data drift" width="920"/>
 
