@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.0] - 2026-07-13
+
+### Added
+- **Multi-tenant monitoring API (`/api/v1`)** — Sentinel is now
+  monitoring-as-a-service. Register a model, stream predictions over HTTP
+  (single or batch), attach ground truth later, and pull drift / performance /
+  alert reports back — from any language, no Python import required. One
+  server watches any number of isolated models via a thread-safe registry.
+  - `POST /api/v1/models`, `GET/DELETE /api/v1/models/{id}`,
+    `POST /api/v1/models/{id}/predictions[/batch]`,
+    `PATCH …/predictions/{rid}`, `GET …/drift|performance|alerts|health`,
+    `POST …/alert-rules`.
+  - Optional bearer-token / `X-API-Key` auth via `SENTINEL_API_TOKEN`.
+  - Interactive Swagger console at `/docs`; full reference in `API.md`;
+    runnable client in `examples/api_client.py`.
+- 8 new API tests (31 total), exercised end-to-end with FastAPI TestClient.
+
+### Changed
+- Dashboard app title/description reflect the API; `set_monitor()` now also
+  registers the monitor into the multi-tenant registry so the demo model is
+  reachable at `/api/v1` too.
+
 ## [0.3.0] - 2026-07-13
 
 ### Added

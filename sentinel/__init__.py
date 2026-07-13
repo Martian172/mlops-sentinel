@@ -5,7 +5,7 @@ from sentinel.core.drift import DriftDetector, DriftReport
 from sentinel.core.alerts import AlertManager, Alert
 from sentinel.core.metrics import MetricsCollector
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __author__ = "Martian172"
 
 __all__ = [

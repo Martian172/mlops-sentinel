@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="mlops-sentinel",
-    version="0.3.0",
+    version="0.4.0",
     author="Martian172",
     author_email="martian172@users.noreply.github.com",
     description="Production ML Model Monitoring & Alerting Toolkit",

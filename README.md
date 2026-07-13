@@ -137,10 +137,38 @@ Six native Prometheus series are exposed, all labeled by model:
 `sentinel_accuracy`, `sentinel_drift_score`, `sentinel_alerts_total`,
 `sentinel_error_rate`.
 
-## REST API & CLI
+## Monitoring API — watch any model over HTTP
+
+Sentinel is also a **monitoring-as-a-service API**: point a model in *any*
+language at a running Sentinel server and get drift detection, performance
+tracking, and alerting back over plain HTTP — no need to import Sentinel in
+your code. One server watches any number of models (multi-tenant).
+
+```bash
+# 1. Register your model (baseline = your training rows)
+curl -X POST http://localhost:8001/api/v1/models -H 'Content-Type: application/json' \
+  -d '{"model_name":"fraud-v2","feature_names":["age","income"],
+       "baseline_data":[[40,65000],[38,62000],[45,71000]]}'
+#   → {"model_id":"fraud-v2-1a2b3c4d", ...}
+
+# 2. Stream predictions from your serving loop
+curl -X POST http://localhost:8001/api/v1/models/fraud-v2-1a2b3c4d/predictions \
+  -H 'Content-Type: application/json' \
+  -d '{"features":{"age":41,"income":66000},"prediction":0,"latency_ms":12}'
+
+# 3. Pull a drift report anytime
+curl http://localhost:8001/api/v1/models/fraud-v2-1a2b3c4d/drift
+```
+
+Full endpoint reference in **[API.md](API.md)**; a runnable Python client is in
+[`examples/api_client.py`](examples/api_client.py); an interactive Swagger
+console is served at **`/docs`**. Optional bearer-token auth via the
+`SENTINEL_API_TOKEN` env var.
+
+## Dashboard REST endpoints & CLI
 
 The dashboard is an ordinary FastAPI app — everything on screen is available
-as JSON (interactive console at `/docs`):
+as JSON:
 
 | Endpoint | Returns |
 |---|---|
@@ -215,17 +243,18 @@ The decisions that matter:
 ```
 sentinel/
 ├── core/            monitor.py · drift.py · alerts.py · metrics.py
+├── api/             registry.py · routes.py · schemas.py  (multi-tenant /api/v1)
 ├── dashboard/       app.py (FastAPI) · templates/ · static/ (vendored Chart.js)
 ├── storage/         backend.py (ABC · in-memory · SQLite)
 ├── integrations/    sklearn.py
 └── cli/             commands.py (Click + Rich)
-tests/               23 tests · seeded, deterministic
+tests/               31 tests · seeded, deterministic
 docker/              Dockerfile · docker-compose.yml · prometheus.yml
 ```
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests/ -q            # 23 passed
+pytest tests/ -q            # 31 passed
 flake8 sentinel --max-line-length=120
 ```
 

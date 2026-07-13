@@ -12,8 +12,18 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Lazy import to avoid circular deps
-app = FastAPI(title="MLOps Sentinel Dashboard", version="0.3.0")
+from sentinel.api.registry import registry
+from sentinel.api.routes import router as api_v1_router
+
+app = FastAPI(
+    title="MLOps Sentinel",
+    version="0.4.0",
+    description=(
+        "Monitoring-as-a-service for ML models: register a model, stream "
+        "predictions over HTTP, and pull drift / performance / alert reports. "
+        "See the multi-tenant API under /api/v1."
+    ),
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount the multi-tenant monitoring API (/api/v1/...)
+app.include_router(api_v1_router)
 
 # In-memory monitor reference (set externally or via startup)
 _monitor = None
@@ -135,7 +148,7 @@ async def get_snapshot():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "0.3.0", "timestamp": time.time()}
+    return {"status": "ok", "version": "0.4.0", "timestamp": time.time()}
 
 
 @app.get("/metrics", response_class=PlainTextResponse)
@@ -160,6 +173,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 def set_monitor(monitor) -> None:
-    """Inject a ModelMonitor instance into the dashboard."""
+    """Inject a ModelMonitor instance into the dashboard and register it in
+    the multi-tenant API registry so it is reachable at /api/v1 too."""
     global _monitor
     _monitor = monitor
+    if monitor is not None:
+        registry.add(getattr(monitor, "model_name", "default"), monitor)
