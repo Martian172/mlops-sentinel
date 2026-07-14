@@ -16,6 +16,11 @@
   - Interactive Swagger console at `/docs`; full reference in `API.md`;
     runnable client in `examples/api_client.py`.
 - 8 new API tests (31 total), exercised end-to-end with FastAPI TestClient.
+- **Self-documenting dashboard** — every metric, chart, and panel now has an
+  ⓘ tooltip that explains, in plain English, what it means and why it matters
+  (drift score, trip line, p95 latency, PSI, p-value, pie/line charts, …),
+  plus a status-color legend. Hover, tap, or keyboard-focus to reveal.
+- Deployed live on Render: https://mlops-sentinel.onrender.com
 
 ### Changed
 - Dashboard app title/description reflect the API; `set_monitor()` now also

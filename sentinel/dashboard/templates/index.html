@@ -176,6 +176,52 @@
   footer a:hover { text-decoration: underline; }
   footer .sep { flex: 1; border-top: 1px dashed var(--line); }
 
+  /* ── info dots + tooltips + legend ─────────────────────── */
+  .info {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid var(--muted); color: var(--muted);
+    font-family: var(--mono); font-size: 9px; font-weight: 600; font-style: normal;
+    cursor: help; user-select: none; flex: none; line-height: 1; vertical-align: middle;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .info:hover, .info:focus, .info.active {
+    background: var(--ink); color: var(--paper); border-color: var(--ink); outline: none;
+  }
+  .panel h2 .info { margin-left: auto; }
+  .inst .sub .info { width: 12px; height: 12px; font-size: 8px; margin-left: 3px; }
+  .head-cell .k .info { width: 11px; height: 11px; font-size: 8px; margin-left: 4px; }
+  th .info { width: 12px; height: 12px; font-size: 8px; margin-left: 4px; }
+  .status-word + .info { width: 15px; height: 15px; font-size: 9px; }
+
+  .tip-bubble {
+    position: fixed; z-index: 1000; max-width: 300px; display: none;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--disp); font-size: .8rem; line-height: 1.5; font-weight: 400;
+    padding: 11px 13px; letter-spacing: 0; text-transform: none;
+    box-shadow: 0 12px 34px rgba(0,0,0,.3); pointer-events: none;
+  }
+  .tip-bubble strong { color: var(--orange); font-weight: 600; }
+  .tip-bubble em { font-style: normal; color: #ffd98c; }
+  .tip-bubble::before {
+    content: ''; position: absolute; width: 9px; height: 9px; background: var(--ink);
+    transform: rotate(45deg); left: var(--arrow-x, 20px); top: -4px;
+  }
+  .tip-bubble.above::before { top: auto; bottom: -4px; }
+
+  /* legend strip */
+  .legend {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px;
+    padding: 9px 26px; border-bottom: 1px solid var(--line);
+    background: var(--panel); font-family: var(--mono); font-size: .68rem; color: var(--muted);
+  }
+  .legend .l-item { display: inline-flex; align-items: center; gap: 7px; }
+  .legend .chip { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.25); flex: none; }
+  .legend .chip.g { background: var(--green); } .legend .chip.a { background: var(--amber); } .legend .chip.r { background: var(--red); }
+  .legend .hint { margin-left: auto; color: var(--ink); }
+  .legend .hint b { color: var(--orange); }
+  @media (max-width: 820px) { .legend .hint { margin-left: 0; } }
+
   @media (max-width: 1250px) {
     .instruments { grid-template-columns: 1fr 1fr 1fr; }
     .grid-main { grid-template-columns: 1fr; }
@@ -194,20 +240,20 @@
     </div>
   </div>
   <div class="head-cell">
-    <span class="k">Model under watch</span>
+    <span class="k">Model under watch <span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Model under watch</strong> — the name of the machine-learning model Sentinel is monitoring. Sentinel works with any model; it only watches the inputs going in and the predictions coming out.">i</span></span>
     <span class="v" id="h-model">—</span>
   </div>
   <div class="head-cell">
-    <span class="k">Task</span>
+    <span class="k">Task <span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Task</strong> — the kind of problem the model solves. <em>Classification</em> picks a category (fraud / not-fraud); <em>regression</em> predicts a number (like a price).">i</span></span>
     <span class="v" id="h-task">—</span>
   </div>
   <div class="head-cell">
-    <span class="k">Uptime</span>
+    <span class="k">Uptime <span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Uptime</strong> — how long this monitor has been running. Every statistic below has been gathered since this moment, so very fresh uptime means the numbers are still settling.">i</span></span>
     <span class="v" id="h-uptime">—</span>
   </div>
   <div class="head-spacer"></div>
   <div class="head-cell">
-    <span class="k">Telemetry link</span>
+    <span class="k">Telemetry link <span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Telemetry link</strong> — the live connection between this page and the server. Green <em>LIVE</em> means the dashboard is updating in real time; red means it dropped and is reconnecting.">i</span></span>
     <span class="v"><span class="lamp" id="ws-lamp"></span><span id="ws-text">CONNECTING</span></span>
   </div>
   <div class="head-cell" style="border-right:none">
@@ -218,7 +264,15 @@
 
 <div class="status-strip nominal" id="status-strip">
   <span class="status-word" id="status-word">STANDING BY</span>
+  <span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>System status</strong> — the overall verdict, worked out from everything below. <strong>Green</strong> = all good; <strong>amber</strong> = drift is starting, keep watching; <strong>red</strong> = act now, usually by retraining the model.">i</span>
   <span class="detail" id="status-detail">waiting for first telemetry…</span>
+</div>
+
+<div class="legend">
+  <span class="l-item"><span class="chip g"></span> Nominal · healthy</span>
+  <span class="l-item"><span class="chip a"></span> Degraded · drift starting</span>
+  <span class="l-item"><span class="chip r"></span> Critical · intervention needed</span>
+  <span class="hint">Hover or tap any <b>ⓘ</b> to learn what a number means</span>
 </div>
 
 <div class="wrap">
@@ -241,47 +295,53 @@
             </svg>
             <div>
               <div class="val" id="v-health">—</div>
-              <div class="sub">HEALTH INDEX</div>
+              <div class="sub">HEALTH INDEX<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Health index</strong> — one score from 0–100 that blends how accurate the model is with how little its input data has drifted. Green ≥ 85 = healthy, amber = watch, red = trouble.">i</span></div>
             </div>
           </div>
-          <div class="inst"><div class="val" id="v-acc">—</div><div class="sub">ACCURACY</div></div>
-          <div class="inst"><div class="val" id="v-drift">—</div><div class="sub">DRIFT SCORE · trip&nbsp;0.50</div></div>
-          <div class="inst"><div class="val" id="v-preds">0</div><div class="sub">PREDICTIONS · <span id="v-ppm">0</span>/min</div></div>
-          <div class="inst"><div class="val" id="v-p95">—</div><div class="sub">P95 LATENCY</div></div>
-          <div class="inst"><div class="val" id="v-alerts">0</div><div class="sub">ALERTS FIRED</div></div>
+          <div class="inst"><div class="val" id="v-acc">—</div><div class="sub">ACCURACY<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Accuracy</strong> — of the predictions where we already know the correct answer, the share the model got right. It only counts predictions that have a true label attached — which in the real world often arrives days or weeks later.">i</span></div></div>
+          <div class="inst"><div class="val" id="v-drift">—</div><div class="sub">DRIFT SCORE · trip&nbsp;0.50<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Drift score</strong> — how different today's incoming data is from the data the model trained on: 0 = identical, 1 = a totally different world. <strong>Trip 0.50</strong> is the line where we officially declare drift (like a circuit breaker tripping).">i</span></div></div>
+          <div class="inst"><div class="val" id="v-preds">0</div><div class="sub">PREDICTIONS · <span id="v-ppm">0</span>/min<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Predictions</strong> — the total number of predictions the model has handled since it started, and how many are arriving each minute right now. A sudden drop in the rate often means something upstream broke.">i</span></div></div>
+          <div class="inst"><div class="val" id="v-p95">—</div><div class="sub">P95 LATENCY<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>P95 latency</strong> — 95% of predictions were faster than this many milliseconds. We use the 95th percentile instead of the average because averages hide the slow requests that real users actually feel.">i</span></div></div>
+          <div class="inst"><div class="val" id="v-alerts">0</div><div class="sub">ALERTS FIRED<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Alerts fired</strong> — how many alarms Sentinel has raised so far. The details of each one appear in the Alert log on the right.">i</span></div></div>
         </div>
       </section>
 
       <!-- main charts -->
       <div class="charts-row">
         <section class="panel"><span class="tick-b"></span>
-          <h2><span class="idx">02</span> Accuracy over time · 20-prediction buckets</h2>
+          <h2><span class="idx">02</span> Accuracy over time · 20-prediction buckets<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Accuracy over time</strong> — the model's accuracy plotted as it runs (a <em>line chart</em>). Each dot averages 20 predictions, so you see the trend: a slow slide usually means drift; a sudden cliff means something broke.">i</span></h2>
           <div class="chart-holder"><canvas id="chart-acc"></canvas></div>
         </section>
         <section class="panel"><span class="tick-b"></span>
-          <h2><span class="idx">03</span> Feature drift · PSI (trip 0.20)</h2>
+          <h2><span class="idx">03</span> Feature drift · PSI (trip 0.20)<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Feature drift (bar chart)</strong> — one bar per input showing how far its values have shifted from training, measured by PSI. The dashed line at 0.20 is the industry “investigate now” mark. Red bars have officially drifted; green ones are stable.">i</span></h2>
           <div class="chart-holder"><canvas id="chart-psi"></canvas></div>
         </section>
       </div>
 
       <div class="charts-row-2">
         <section class="panel"><span class="tick-b"></span>
-          <h2><span class="idx">04</span> Prediction mix</h2>
+          <h2><span class="idx">04</span> Prediction mix<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Prediction mix (pie chart)</strong> — the share of each answer the model is giving (e.g. class 0 vs class 1). If this mix suddenly changes, the model's behaviour changed — a useful clue even before we know whether it's right.">i</span></h2>
           <div class="chart-holder short"><canvas id="chart-mix"></canvas></div>
         </section>
         <section class="panel"><span class="tick-b"></span>
-          <h2><span class="idx">05</span> Latency · last 100 requests (ms)</h2>
+          <h2><span class="idx">05</span> Latency · last 100 requests (ms)<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Latency (line chart)</strong> — the response time of the last 100 predictions, in milliseconds. Occasional spikes are normal; a steadily rising floor means a systemic slowdown.">i</span></h2>
           <div class="chart-holder short"><canvas id="chart-lat"></canvas></div>
         </section>
       </div>
 
       <!-- feature detail -->
       <section class="panel"><span class="tick-b"></span>
-        <h2><span class="idx">06</span> Feature inspection · baseline vs production</h2>
+        <h2><span class="idx">06</span> Feature inspection · baseline vs production<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Feature inspection</strong> — the evidence behind the drift bars. For each input it shows its training average vs its current average, plus the statistical test results. A “drifted” verdict needs real proof, not a guess.">i</span></h2>
         <table>
           <thead>
-            <tr><th>Feature</th><th>Test</th><th>Baseline μ</th><th></th><th>Production μ</th>
-                <th>p-value</th><th>PSI</th><th>Verdict</th></tr>
+            <tr><th>Feature</th>
+                <th>Test<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Test</strong> — which statistical test was used: <em>KS</em> for continuous numbers, <em>CHI²</em> for categories. Sentinel picks automatically per feature.">i</span></th>
+                <th>Baseline μ<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Baseline μ</strong> — the average (μ means “mean”) of this feature in the training data: what “normal” looked like.">i</span></th>
+                <th></th>
+                <th>Production μ<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Production μ</strong> — the average of this feature in live traffic right now. Compare it against the baseline to see the shift.">i</span></th>
+                <th>p-value<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>p-value</strong> — the chance the difference is just random luck. Below 0.05 means the change is almost certainly real, not noise.">i</span></th>
+                <th>PSI<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>PSI</strong> — Population Stability Index, i.e. how big the shift is. Under 0.1 stable · 0.1–0.2 watch · over 0.2 investigate.">i</span></th>
+                <th>Verdict<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Verdict</strong> — the final call for this feature. “Drifted” requires hard statistical proof (p &lt; 0.05 or PSI &gt; 0.20), never just a hunch.">i</span></th></tr>
           </thead>
           <tbody id="feature-rows">
             <tr><td colspan="8" style="color:var(--muted)">awaiting drift telemetry…</td></tr>
@@ -293,14 +353,14 @@
     <!-- right rail -->
     <aside class="rail">
       <section class="panel"><span class="tick-b"></span>
-        <h2><span class="idx">07</span> Alert log</h2>
+        <h2><span class="idx">07</span> Alert log<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Alert log</strong> — every alarm in time order, newest first. In a real deployment these same alerts are pushed to Slack, email, or a webhook so the team hears about them instantly.">i</span></h2>
         <div class="feed" id="alert-feed">
           <div class="feed-empty">no alerts fired — system quiet</div>
         </div>
       </section>
 
       <section class="panel"><span class="tick-b"></span>
-        <h2><span class="idx">08</span> Manual telemetry entry</h2>
+        <h2><span class="idx">08</span> Manual telemetry entry<span class="info" role="button" tabindex="0" aria-label="What is this?" data-tip="<strong>Manual entry</strong> — type a prediction as JSON and send it to the model, exactly like a real app would through the API. Try unusual values (e.g. age 12, income 500000) and watch the instruments react.">i</span></h2>
         <textarea id="log-json" spellcheck="false">{"features": {"age": 34, "income": 72000, "credit_score": 655}, "prediction": 0, "actual": 0}</textarea>
         <button class="btn" onclick="logPrediction()">Transmit</button>
         <div class="form-note" id="form-note">POST /api/log — one prediction record</div>
@@ -310,7 +370,7 @@
 </div>
 
 <footer>
-  <span>SENTINEL v0.3.0</span>
+  <span>SENTINEL v0.4.0</span>
   <span class="sep"></span>
   <a href="/docs">API console</a>
   <a href="/metrics">prometheus /metrics</a>
@@ -584,6 +644,50 @@ setInterval(pollSnapshot, 4000);
 setInterval(pollPerformance, 10000);
 setInterval(pollDrift, 10000);
 setInterval(pollAlerts, 6000);
+
+/* ── explain-me tooltips: one shared bubble, hover + keyboard + tap ── */
+(function initTips() {
+  const bubble = document.createElement('div');
+  bubble.className = 'tip-bubble';
+  document.body.appendChild(bubble);
+  let active = null;
+
+  function show(el) {
+    const tip = el.getAttribute('data-tip');
+    if (!tip) return;
+    bubble.innerHTML = tip;
+    bubble.style.display = 'block';
+    bubble.classList.remove('above');
+    const r = el.getBoundingClientRect();
+    const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
+    let left = r.left + r.width / 2 - bw / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - bw - 8));
+    let top = r.bottom + 10;
+    if (top + bh > window.innerHeight - 8) { top = r.top - bh - 10; bubble.classList.add('above'); }
+    bubble.style.left = left + 'px';
+    bubble.style.top = top + 'px';
+    const arrowX = Math.max(10, Math.min(r.left + r.width / 2 - left - 4, bw - 18));
+    bubble.style.setProperty('--arrow-x', arrowX + 'px');
+    if (active) active.classList.remove('active');
+    active = el; el.classList.add('active');
+  }
+  function hide() {
+    bubble.style.display = 'none';
+    if (active) { active.classList.remove('active'); active = null; }
+  }
+
+  document.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mouseenter', () => show(el));
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', () => show(el));
+    el.addEventListener('blur', hide);
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
+    el.addEventListener('click', e => { e.stopPropagation(); (active === el) ? hide() : show(el); });
+  });
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+  document.addEventListener('click', hide);
+})();
 </script>
 </body>
 </html>
